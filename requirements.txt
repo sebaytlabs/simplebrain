@@ -1,0 +1,2 @@
+PySide6-Essentials>=6.7
+python-dateutil>=2.8
