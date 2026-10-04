@@ -9,7 +9,8 @@ ICON = os.path.join(SPECPATH, "icon.png")  # PyInstaller converts to .ico/.icns 
 a = Analysis(
     [os.path.join(ROOT, "simplebrain_app.py")],
     pathex=[ROOT],
-    datas=[(ICON, ".")],
+    datas=[(ICON, "."), (os.path.join(ROOT, "THIRD-PARTY-NOTICES.md"), "."),
+           (os.path.join(ROOT, "LICENSE"), "."), (os.path.join(ROOT, "LICENSES"), "LICENSES")],
     excludes=["tkinter", "gi"],
 )
 pyz = PYZ(a.pure)
