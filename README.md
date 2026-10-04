@@ -62,7 +62,9 @@ python simplebrain_app.py
 Tests: `python simplebrain_core.py` and `QT_QPA_PLATFORM=offscreen python tests/test_app.py`.
 
 Installers: `pip install -r requirements-build.txt && pyinstaller packaging/simplebrain.spec`,
-then `packaging/linux/build-appimage.sh` (Linux AppImage). On Windows, with Inno Setup:
+then `packaging/linux/build-appimage.sh` (Linux AppImage). Release builds use
+`packaging/linux/build-in-docker.sh`, which compiles inside Ubuntu 22.04 so the
+AppImage runs on older distributions too. On Windows, with Inno Setup:
 
 ```
 python -c "from PIL import Image; Image.open('packaging/icon.png').save('build/icon.ico', sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])"
