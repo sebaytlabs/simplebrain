@@ -52,17 +52,26 @@ folder, e.g. a USB drive.
 
 ## Build from source
 
-Python 3.10+:
+Linux, Python 3.10+. Build, test and install it into your app menu:
 
 ```
-pip install -r requirements.txt
-python simplebrain_app.py
+git clone https://github.com/sebaytlabs/simplebrain.git
+cd simplebrain
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r requirements-build.txt
+python simplebrain_core.py
+QT_QPA_PLATFORM=offscreen python tests/test_app.py
+pyinstaller packaging/simplebrain.spec
+packaging/linux/install.sh
 ```
 
-Tests: `python simplebrain_core.py` and `QT_QPA_PLATFORM=offscreen python tests/test_app.py`.
+The two tests print `selftest OK` and `app test OK`. `install.sh` puts the app
+in `~/.local/share/simplebrain/app`, adds it to your app menu and adds a
+`simplebrain` command. Run it again after a rebuild to update. To run from
+source without installing: `python simplebrain_app.py`.
 
-Installers: `pip install -r requirements-build.txt && pyinstaller packaging/simplebrain.spec`,
-then `packaging/linux/build-appimage.sh` (Linux AppImage). Release builds use
+Portable AppImage: after `pyinstaller`, run `packaging/linux/build-appimage.sh`. Release builds use
 `packaging/linux/build-in-docker.sh`, which compiles inside Ubuntu 22.04 so the
 AppImage runs on older distributions too. On Windows, with Inno Setup:
 
