@@ -1,4 +1,4 @@
-; Inno Setup installer: iscc /DAppVersion=0.1.0 packaging\windows\simplebrain.iss
+; Inno Setup installer: iscc /DAppVersion=0.1.1 packaging\windows\simplebrain.iss
 ; Per-user install (no admin prompt); re-running a newer installer updates in place.
 [Setup]
 AppId={{CD3638FD-1047-479E-9E30-3F3A09771266}

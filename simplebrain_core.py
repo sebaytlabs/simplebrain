@@ -15,7 +15,7 @@ from datetime import date, datetime, timedelta
 
 from dateutil.rrule import rrulestr
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 
 VAULT = os.environ.get("SIMPLEBRAIN_VAULT") or os.path.expanduser("~/Documents/SimpleBrain")
 INBOX_FILE = "Inbox.md"
