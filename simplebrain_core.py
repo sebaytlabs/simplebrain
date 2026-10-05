@@ -300,7 +300,7 @@ def answers_note_text(keyword, linkers, answers):
 
 def sync_answer_notes(vault=VAULT):
     """Rebuild the "<Keyword> - Answers" notes: one per [[link]] made by a
-    note holding answer:: lines (not Home: it would collect everything).
+    note holding answer:: lines, Home included.
     Writes only what changed, trashes one whose keyword lost its last
     answer, and never touches a same-named note the user wrote (no
     ANSWERS_MARK). Returns the files written or trashed.
@@ -313,7 +313,7 @@ def sync_answer_notes(vault=VAULT):
     for n in sources:
         for k in dict.fromkeys(parse_links(texts[n])):
             linkers.setdefault(k, []).append(n)
-    skip = {"Home", note_title(INBOX_FILE), note_title(CALENDAR_FILE)}
+    skip = {note_title(INBOX_FILE), note_title(CALENDAR_FILE)}
     wanted = {k + ANSWERS_SUFFIX + ".md": answers_note_text(k, ns, answers)
               for k, ns in linkers.items()
               if k not in skip and k + ".md" not in generated and is_safe_note_title(k + ANSWERS_SUFFIX)
@@ -982,11 +982,12 @@ def selftest():
         write_note("Book1.md", "[[Home]] [[Focus]]\n1. How?\nanswer:: Block mornings\n", d)
         write_note("Book2.md", "[[Focus]] [[Grit]]\n1. Why?\nanswer:: Small wins\n", d)
         write_note("Book3.md", "[[Focus]]\n", d)  # linked, no answers: listed, adds nothing
-        assert sync_answer_notes(d) == ["Focus - Answers.md", "Grit - Answers.md"]
+        assert sync_answer_notes(d) == ["Focus - Answers.md", "Grit - Answers.md", "Home - Answers.md"]
         focus = read_note("Focus - Answers.md", d)
         assert "- [[Book3]]" in focus and "**1. How?**\nBlock mornings" in focus and "Small wins" in focus
         assert "### [[Book3]]" not in focus and not parse_answers(focus)
-        assert not os.path.exists(os.path.join(d, "Home - Answers.md"))
+        # every linked note gets one, Home too (a Learning Note links only [[Home]] until trigger words are added)
+        assert "**1. How?**\nBlock mornings" in read_note("Home - Answers.md", d)
         assert sync_answer_notes(d) == []  # nothing changed; generated notes aren't sources
         write_note("Book2.md", "[[Focus]]\n", d)  # answer gone: Focus rebuilt, Grit trashed
         assert sync_answer_notes(d) == ["Focus - Answers.md", "Grit - Answers.md"]
@@ -995,7 +996,7 @@ def selftest():
         write_note("Grit - Answers.md", "my own note\n", d)  # user-written, same name
         write_note("Book2.md", "[[Grit]]\nanswer:: x\n", d)
         assert "Grit - Answers.md" not in sync_answer_notes(d) and read_note("Grit - Answers.md", d) == "my own note\n"
-        for n in ("Book1.md", "Book2.md", "Book3.md", "Focus - Answers.md", "Grit - Answers.md"):
+        for n in ("Book1.md", "Book2.md", "Book3.md", "Focus - Answers.md", "Grit - Answers.md", "Home - Answers.md"):
             os.remove(os.path.join(d, n))
 
         # delete_note: reversible (moved to .trash, not removed), dedup on collision
