@@ -1,0 +1,5 @@
+PySide6-Essentials>=6.8,<6.10  # 6.10+ needs an SSE4.2 processor: old computers would not start
+python-dateutil>=2.8
+tzdata>=2024.1  # Windows has no system time-zone database
+iroh>=1.1; sys_platform != 'darwin' or platform_machine != 'x86_64'  # no Intel-Mac build: sync is off there
+segno>=1.6

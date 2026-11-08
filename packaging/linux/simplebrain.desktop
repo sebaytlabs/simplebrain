@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=SimpleBrain
+Comment=Notes, tasks, calendar and graph
+Exec=SimpleBrain
+Icon=simplebrain
+Terminal=false
+Categories=Office;
+StartupWMClass=SimpleBrain

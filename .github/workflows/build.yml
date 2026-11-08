@@ -1,0 +1,134 @@
+# Builds and tests SimpleBrain on all three systems and uploads a portable folder for each.
+# A PyInstaller build only runs on the OS it was built on, so this is how Windows and macOS
+# builds are produced without owning those machines. Download the artifacts, then merge the
+# three folders onto one exFAT USB drive (they share simplebrain-settings.json and Vault/).
+name: build
+on:
+  workflow_dispatch:
+  pull_request:  # tests on all three systems before a change is merged
+  push:
+    branches: [main]  # every version that lands on main is built, tested and released (once per version)
+    tags: ["v*"]
+permissions:
+  contents: write  # the release job publishes; the build jobs only read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest, macos-15, macos-15-intel]  # macos-14 jobs are cancelled at once now  # macos-15-intel: Intel Macs (2015-2020) too
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Qt runtime libraries (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libxkbcommon-x11-0 libdbus-1-3 libxcb-cursor0 libgl1
+      - run: python -m pip install -r requirements-build.txt
+      - name: Tests
+        shell: bash
+        run: |
+          python simplebrain_core.py
+          python simplebrain_ics.py
+          python simplebrain_recommend.py
+          python simplebrain_publish.py
+          python simplebrain_sync.py
+          python simplebrain_desk.py
+          python simplebrain_today.py
+          python simplebrain_find.py
+          python simplebrain_habits.py
+          python simplebrain_update.py
+          python simplebrain_watch.py
+          python simplebrain_drop.py
+          python simplebrain_budget.py
+          python simplebrain_links.py
+          python simplebrain_day.py
+          python simplebrain_mail.py
+          python simplebrain_dataview.py
+          QT_QPA_PLATFORM=offscreen python tests/test_app.py
+          python tools/supervise.py --quick
+      - run: pyinstaller packaging/simplebrain.spec
+      - name: Smoke-test the built program
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then dist/SimpleBrain.app/Contents/MacOS/SimpleBrain --selftest
+          elif [ "$RUNNER_OS" = "Windows" ]; then dist/SimpleBrain/SimpleBrain.exe --selftest
+          else dist/SimpleBrain/SimpleBrain --selftest; fi
+      - name: Portable folder  # built to prove it still builds; not uploaded (artifacts filled the 0.5 GB quota)
+        shell: bash
+        run: python packaging/portable/make_portable.py portable
+      - name: Version
+        id: ver
+        shell: bash
+        run: echo "v=$(python -c 'import simplebrain_core as c; print(c.VERSION)')" >> "$GITHUB_OUTPUT"
+      - name: Linux AppImage
+        if: runner.os == 'Linux'
+        run: |
+          packaging/linux/build-appimage.sh
+          cd dist && sha256sum SimpleBrain-x86_64.AppImage > SimpleBrain-x86_64.AppImage.sha256  # the updater checks it
+      - name: Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python -c "from PIL import Image; Image.open('packaging/icon.png').save('build/icon.ico', sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])"
+          if (-not (Get-Command iscc -ErrorAction SilentlyContinue)) { choco install innosetup -y --no-progress; $env:PATH += ";C:\Program Files (x86)\Inno Setup 6" }
+          iscc /DAppVersion=${{ steps.ver.outputs.v }} packaging\windows\simplebrain.iss
+      - name: Mac disk image
+        if: runner.os == 'macOS'
+        run: |
+          codesign --force --deep --sign - dist/SimpleBrain.app
+          mkdir dmg && cp -R dist/SimpleBrain.app dmg/ && ln -s /Applications dmg/Applications
+          hdiutil create -volname SimpleBrain -srcfolder dmg -ov -format UDZO "dist/SimpleBrain-${{ steps.ver.outputs.v }}-mac-${{ runner.arch }}.dmg"
+      # Straight onto a draft release, never an Actions artifact: four systems' files were over the free 0.5 GB of
+      # artifact storage and every build failed. A draft isn't "latest", so no copy updates to it until it's published.
+      - name: Upload to the draft release
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="${{ steps.ver.outputs.v }}"
+          draft=$(gh release view "v$v" --repo "$GITHUB_REPOSITORY" --json isDraft -q .isDraft 2>/dev/null || echo none)
+          [ "$draft" = "false" ] && { echo "v$v is already published"; exit 0; }
+          [ "$draft" = "none" ] && { gh release create "v$v" --draft --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "SimpleBrain $v" --notes "building" || true; }  # another system may have made it a moment ago
+          shopt -s nullglob
+          gh release upload "v$v" dist/*.AppImage dist/*.AppImage.sha256 dist/*-setup.exe dist/*.dmg \
+            --repo "$GITHUB_REPOSITORY" --clobber
+
+  # Installed copies update themselves from the newest release (simplebrain_update), so a new VERSION on main
+  # becomes a release here: the draft the build jobs filled gets the zip and checksums, then is published.
+  # A version already published is left alone.
+  release:
+    needs: build
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - id: ver  # read from the file: importing the app here (no requirements installed) failed and gave a release named 'v'
+        run: |
+          v=$(grep -oP '^VERSION = "\K[0-9.]+(?=")' simplebrain_core.py)
+          [ -n "$v" ] || { echo "no VERSION in simplebrain_core.py"; exit 1; }
+          echo "v=$v" >> "$GITHUB_OUTPUT"
+      - id: have
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # "exists" means published; the draft the build jobs filled is what gets published here
+          if [ "$(gh release view "v${{ steps.ver.outputs.v }}" --repo "$GITHUB_REPOSITORY" --json isDraft -q .isDraft 2>/dev/null)" = "false" ]; then
+            echo "exists=yes" >> "$GITHUB_OUTPUT"; else echo "exists=no" >> "$GITHUB_OUTPUT"; fi
+      - if: steps.have.outputs.exists == 'no'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="${{ steps.ver.outputs.v }}"
+          awk -v h="## $v" '$0==h{on=1;next} /^## /{on=0} on' CHANGELOG.md > notes.md
+          gh release download "v$v" --repo "$GITHUB_REPOSITORY" -D downloads
+          # one zip for the store page (Windows, Mac and Linux in one download), and a checksum for every file:
+          # installed copies refuse an update whose checksum doesn't match (0.3.1 and older read the .sha256 file)
+          (cd downloads && zip -q -9 SimpleBrain.zip * && sha256sum * > SHA256SUMS)
+          gh release upload "v$v" downloads/SimpleBrain.zip downloads/SHA256SUMS --repo "$GITHUB_REPOSITORY" --clobber
+          gh release edit "v$v" --repo "$GITHUB_REPOSITORY" --title "SimpleBrain $v" --notes-file notes.md \
+            --draft=false --latest

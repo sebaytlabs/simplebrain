@@ -1,0 +1,4 @@
+-r requirements.txt
+-c constraints.txt
+pyinstaller>=6.10
+pillow>=10
