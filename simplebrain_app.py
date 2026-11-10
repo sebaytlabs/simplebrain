@@ -2184,9 +2184,8 @@ class SimpleBrain(QMainWindow):
              "(rename) and the × (to the trash, never gone for good). Home explains everything in short lines.",
              [self.notes_list], "click <b>Home</b> in the list.",
              {"start": away_from_home, "check": lambda _: self.current_note == "Home.md"}),
-            ("A note for a book", "A Learning Note is a page for a book you're studying, in three short sittings: "
-             "a first look and your questions, the answers the next day, then saying it back from memory. Each "
-             "sitting is a task: tick it and the next one appears on its day.",
+            ("A note for a book", "A Learning Note is a page for a book you're studying. Each sitting is a task: "
+             "tick it and the next one appears on its day.",
              [self.learning_button], "click <b>+ New Learning Note</b>, type the title of a book you're reading, "
              "and click <b>OK</b>.",
              {"start": note, "check": lambda old: self.current_note != old and core.is_book_note(text())}),

@@ -63,4 +63,4 @@ one-letter tasks/inbox/calendar. PySide6 desktop app for Linux, one user.
 - The vault's `.config` holds the calendar feed link, which is a secret: don't read or print it.
 
 ## Notes
-- The GitHub repo is private; the README install link points to the Sebayt Labs store product page.
+- The GitHub repo is public (since 2026-11-10, so installed copies can self-update); the README install link points to the Sebayt Labs store product page.
