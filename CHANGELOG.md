@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.6.1
+- `next mon` (any `next` + day) means that day next week. On a Tuesday, `next mon` is in six days, not thirteen.
+
 ## 0.6.0
 - **A book note is now a study plan.** **+ New Learning Note** lays a book out as three short sittings and two checks:
   a first look where you write your purpose and your questions; the answers the next day, one question at a time,

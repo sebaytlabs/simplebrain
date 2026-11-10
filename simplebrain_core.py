@@ -26,7 +26,7 @@ from datetime import date, datetime, timedelta
 
 from simplebrain_ics import parse_ics
 
-VERSION = "0.6.0"
+VERSION = "0.6.1"
 
 INBOX_FILE = "Inbox.md"
 CALENDAR_FILE = "Calendar.md"
@@ -993,8 +993,10 @@ def natural_date(s, today=None):
         return today + timedelta(days=int(m.group(1)) * {"day": 1, "week": 7, "month": 30}[m.group(2)])
     m = re.fullmatch(r"(next |this )?([a-z.]+)", t)
     if m and (wd := _named(m.group(2), WEEKDAY_NAMES)) is not None:
-        ahead = (wd - today.weekday()) % 7
-        return today + timedelta(days=ahead + (7 if m.group(1) == "next " else 0))
+        if m.group(1) == "next ":  # that day in next week (US weeks start on Sunday): on a Tuesday, "next mon" is in 6 days
+            sunday = today - timedelta(days=(today.weekday() + 1) % 7)
+            return sunday + timedelta(days=7 + (wd + 1) % 7)
+        return today + timedelta(days=(wd - today.weekday()) % 7)
     m = re.fullmatch(r"(\d{1,2})[/-](\d{1,2})", t)
     parts = None
     if m:
@@ -2053,6 +2055,9 @@ def selftest():
     assert nd("oct 3") == date(2027, 10, 3) and nd("dec 31st") == date(2026, 12, 31)  # passed: next year
     assert nd("fr") is None and nd("call") is None and nd("2 apples") is None and nd("13-40") is None and nd("feb 30") is None
     assert split_date("next fri 2pm dentist", sun) == (date(2026, 11, 13), "2pm dentist")
+    tue = date(2026, 11, 10)  # a Tuesday: "next" means next week's day, not the one after the coming one
+    assert natural_date("next mon", tue) == date(2026, 11, 16) and natural_date("next fri", tue) == date(2026, 11, 20)
+    assert natural_date("mon", tue) == date(2026, 11, 16) and natural_date("next tue", tue) == date(2026, 11, 17)
     assert split_date("11-20-2026 Conference", sun) == (date(2026, 11, 20), "Conference")
     assert split_date("dentist", sun) == (None, "dentist")
     assert trailing_date("call the bank fri", sun) == ("call the bank", date(2026, 11, 6))
