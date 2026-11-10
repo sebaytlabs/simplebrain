@@ -345,5 +345,5 @@ class MailWindow(QDialog):
         note = mail_note(self.msg)
         core.add_local_event(d.isoformat(), t or None, f"{title.strip()} [[{note}]]")
         self.app.refresh_notes_list()
-        self.app.refresh_calendar(sync=True)  # pushes it to the Fastmail calendar too
+        self.app.refresh_calendar(sync=True)  # pushes it to a connected calendar too
         self.status.setText(f"Event on {core.show_date(d)}{' ' + t if t else ''}, also on your calendar.")

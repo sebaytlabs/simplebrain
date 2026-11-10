@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Updates that install themselves, and one-time clean-ups after an update. No Qt here.
+"""Updates that install themselves. No Qt here.
 
 - Run from a git checkout (./dev.sh or python simplebrain_app.py): fetch, and when the branch is only behind
   (nothing of yours would be overwritten) fast-forward it; requirements that changed are installed into the
   same Python. The app restarts when you're not using its window (dev.sh restarts it by itself).
-- Installed build: the newest GitHub release's AppImage, checksum-checked (simplebrain_core.install_update).
-- Clean-ups: undo_missions_trial takes back what the short-lived 'missions' version (0.3.0 pre-release)
-  put in tasks and the calendar; originals go to the vault's .trash first.
+- Installed copy (Windows installer, Mac app, Linux AppImage or install.sh): the newest GitHub release's file for
+  this system, downloaded, checked against the release's checksum, and swapped in (stage_update, apply_now,
+  restart_command). A copy on a USB drive is left for its owner to replace.
 
 Run: python simplebrain_update.py   (selftest)
 """
@@ -86,18 +86,6 @@ def pip_command(repo, changed, python=sys.executable):
     if os.path.exists(os.path.join(repo, "constraints.txt")):
         cmd += ["-c", os.path.join(repo, "constraints.txt")]
     return cmd
-
-
-def latest_release_public(repo=core.REPO, timeout=10):
-    """The newest release tag through GitHub's public API (no gh login needed once the repo is public)."""
-    try:
-        req = urllib.request.Request(f"https://api.github.com/repos/{repo}/releases/latest",
-                                     headers={"Accept": "application/vnd.github+json"})
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            tag = json.load(r).get("tag_name", "")
-    except (OSError, ValueError):
-        return None
-    return tag if re.fullmatch(r"v?\d+(\.\d+)*", tag or "") else None
 
 
 # ---------- installed copies on every system: find the newest release, stage it, swap it in ----------
@@ -241,7 +229,7 @@ def apply_now(kind, staged, appimage=None):
 
 def restart_command(kind, staged, app_path, args=()):
     """The command that installs a staged Windows/Mac download after SimpleBrain quits and starts the new one
-    (with the arguments it was running with, so the desktop stays the desktop)."""
+    (with the arguments it was running with)."""
     if kind == "windows":
         setup = subprocess.list2cmdline([staged, "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS"])
         again = subprocess.list2cmdline([app_path, *args])
@@ -261,118 +249,11 @@ def staging_dir():
     return os.path.join(core.user_config_dir(), "update")
 
 
-# ---------- one-time clean-up of the 'missions' trial ----------
-
-TRIAL_GO_LINE = "Each step below is one sitting. GO (or Super+G) opens it; tick it when it's done."
-MISSION_LINE = re.compile(r"^#mission\b(.*)$")
-PLAN_AREA_LINE = re.compile(r"^#mission \[\[([^\]]+)\]\]$", re.M)
-
-
-def made_by_trial(filename, text):
-    """Only notes the trial wrote, by its exact wording: a #mission tag someone uses themselves is left alone."""
-    if TRIAL_GO_LINE in text:
-        return True  # a dropped folder
-    m = PLAN_AREA_LINE.search(text)
-    if m and core.note_title(filename).startswith(m.group(1) + " - "):
-        return True  # one area of an imported plan
-    return "\n#mission\n" in text and re.search(r"Imported from .+\.xlsx\. One mission per area:", text) is not None
-
-
-def undo_missions_trial(vault=None):
-    """The trial turned a dropped folder or plan into a note tagged #mission with one task per step and one
-    calendar event per step. Keep each note and every file link in it; turn the step tasks into headings
-    (plan rows into a plain list), drop the #mission tag, its target icon and the calendar events that point
-    to those notes. Originals are copied to .trash first. Returns (notes changed, tasks removed, events removed)."""
-    vault = vault or core.VAULT
-    notes, tasks = [], 0
-    for n in core.list_user_notes(vault):
-        text = core.read_note(n, vault)
-        lines = text.split("\n")
-        if not made_by_trial(n, text):
-            continue
-        core.write_atomic(core.note_trash_path(n, vault), text)
-        out = []
-        for line in lines:
-            m = MISSION_LINE.match(line)
-            if m:
-                if m.group(1).strip():
-                    out.append(m.group(1).strip())  # '#mission [[Money-Plan]]' keeps its link
-                continue
-            if line.strip() == TRIAL_GO_LINE:
-                continue
-            t = core.TASK_RE.match(line)
-            if t:
-                tasks += 1
-                body = core.DUE_RE.sub("", t.group(4)).strip()
-                done = (t.group(3) or "").lower() == "x"
-                if "▸" in body:
-                    out.append("## " + body.split("▸", 1)[1].strip() + (" (done)" if done else ""))
-                else:
-                    due = core.DUE_RE.search(t.group(4))
-                    d = core.parse_date(due.group(1)) if due else None
-                    out.append(f"- {body}" + (f" ({core.show_date(d)})" if d else "") + (" (done)" if done else ""))
-                continue
-            out.append(line)
-        core.write_note(n, "\n".join(out), vault)
-        notes.append(n)
-    events = 0
-    if notes:
-        titles = {core.note_title(n) for n in notes}
-        cal = os.path.join(vault, core.CALENDAR_FILE)
-        text = core.read_note(core.CALENDAR_FILE, vault)
-        keep = []
-        for line in text.split("\n"):
-            m = core.CAL_LINE_RE.match(line)
-            links = core.parse_links(m.group(3)) if m else []
-            if m and links and links[-1] in titles and m.group(3).rstrip().endswith(f"[[{links[-1]}]]"):
-                events += 1
-                continue
-            keep.append(line)
-        if events:
-            core.write_atomic(core.note_trash_path(core.CALENDAR_FILE, vault), text)
-            core.write_atomic(cal, "\n".join(keep))
-        icons = core.graph_icons(vault)
-        for n in notes:
-            if icons.get(n) == "🎯":
-                core.set_graph_icon(n, vault=vault)
-    return notes, tasks, events
-
-
 def selftest():
     import shutil
     import tempfile
     d = tempfile.mkdtemp()
     try:
-        # the clean-up, on what the trial wrote
-        v = os.path.join(d, "vault")
-        core.ensure_vault(v)
-        core.write_note("Videos.md", "# Videos\n#mission\n\nfolder:: /media/owner/Backup/Videos\n" + TRIAL_GO_LINE + "\n\n"
-                        "t Videos ▸ Session 00 due:2026-11-01\nfile:: /media/owner/Backup/Videos/videos__00 - Introduction.mp4\n\n"
-                        "- [x] Videos ▸ Session 01\nfile:: /media/owner/Backup/Videos/videos__01.mp4\n", v)
-        core.write_note("Money-Plan - Money.md", "# Money-Plan - Money\n#mission [[Money-Plan]]\n\n"
-                        "t 8am: Call Riverside due:2026-11-02\n  Avoids a fee\n", v)
-        core.write_note("Mine.md", "# Mine\n#mission\nt my own task due:2026-11-03\n#missionary is a word\n", v)
-        core.write_note("Money-Plan.md", "# Money-Plan\n#mission\n\nImported from Money-Plan.xlsx. One mission per area:\n\n"
-                        "- [[Money-Plan - Money]]\n", v)
-        core.add_local_event("2026-11-01", "19:00", "Videos ▸ Session 00 [[Videos]]", v)
-        core.add_local_event("2026-11-02", "08:00", "Call Riverside [[Money-Plan - Money]]", v)
-        core.add_local_event("2026-11-03", "14:00", "Cafe shift", v)
-        core.add_local_event("2026-11-04", None, "Coffee about [[Videos]] with Dad", v)
-        core.set_graph_icon("Videos.md", emoji="🎯", vault=v)
-        notes, tasks, events = undo_missions_trial(v)
-        assert sorted(notes) == ["Money-Plan - Money.md", "Money-Plan.md", "Videos.md"] and tasks == 3 and events == 2
-        assert "#mission" in core.read_note("Mine.md", v)  # a note of yours with the tag isn't the trial's
-        vid = core.read_note("Videos.md", v)
-        assert "#mission" not in vid and TRIAL_GO_LINE not in vid and "## Session 00\nfile:: /media/owner/Backup/Videos/videos__00" in vid
-        assert "## Session 01 (done)" in vid and "folder:: /media/owner/Backup/Videos" in vid
-        assert "- 8am: Call Riverside (11-02-2026)\n  Avoids a fee" in core.read_note("Money-Plan - Money.md", v)
-        assert "[[Money-Plan]]" in core.read_note("Money-Plan - Money.md", v)
-        assert [t["text"] for t in core.parse_tasks(v)] == ["my own task due:2026-11-03"]  # yours stay
-        assert [e["title"] for e in core.read_local_events(v)] == ["Cafe shift", "Coffee about [[Videos]] with Dad"]
-        assert "Videos.md" not in core.graph_icons(v)
-        assert os.path.exists(os.path.join(v, ".trash", "Videos.md")) and os.path.exists(os.path.join(v, ".trash", "Calendar.md"))
-        assert undo_missions_trial(v) == ([], 0, 0)  # once is enough
-
         # installed copies: which kind, which file of the release, checksum or nothing, the AppImage swapped in place
         assert install_kind(env={"APPIMAGE": "/x/S.AppImage"}) == "appimage"
         assert install_kind(frozen=False, env={}) is None
@@ -411,8 +292,8 @@ def selftest():
             raise AssertionError("no checksum, no install")
         except OSError as e:
             assert "checksum" in str(e)
-        win = restart_command("windows", r"C:\t\setup.exe", r"C:\p\SimpleBrain.exe", ["--desktop"])
-        assert win[:2] == ["cmd", "/c"] and "/VERYSILENT" in win[2] and win[2].endswith("SimpleBrain.exe --desktop")
+        win = restart_command("windows", r"C:\t\setup.exe", r"C:\p\SimpleBrain.exe", ["--toggle"])
+        assert win[:2] == ["cmd", "/c"] and "/VERYSILENT" in win[2] and win[2].endswith("SimpleBrain.exe --toggle")
         mac = restart_command("mac-arm", "/t/s.dmg", "/Applications/SimpleBrain.app")
         assert "hdiutil attach" in mac[2] and mac[2].rstrip().endswith('open -n "/Applications/SimpleBrain.app"')
         assert restart_command("appimage", "x", "y") is None

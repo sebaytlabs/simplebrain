@@ -18,6 +18,18 @@ and it teaches itself to you one step at a time.
 | Linux (Mint, Ubuntu 22.04+, Debian, Fedora…) | `SimpleBrain-x86_64.AppImage` | `chmod +x SimpleBrain-x86_64.AppImage` then double-click it. It adds itself to your app menu. |
 | All three | `SimpleBrain.zip` | Everything above in one download (what the store sells). |
 
+### What works where
+
+| | Windows | Mac | Linux |
+|---|---|---|---|
+| Notes, links, graph, tasks, Inbox, calendar, Today, budget, book notes | yes | yes | yes |
+| Email, website publishing, book recommendations | yes | yes | yes |
+| Sync between your devices | yes | Apple chip only | yes |
+| Search across notes and files | yes | yes | yes |
+| Search also lists open windows and installed apps | no | no | yes (X11) |
+| Open a file beside its note, side by side | no | no | yes (X11, needs `wmctrl`) |
+| Play a video inside a note and write down where it is (Ctrl+T) | needs [mpv](https://mpv.io) | needs mpv | needs mpv |
+
 It runs on new laptops and on older ones: Qt is held below 6.10 (6.10 needs SSE4.2), so processors from before about 2009 still
 work, the Linux build carries the one library fresh installs lack, and Wayland laptops are handled.
 
@@ -27,7 +39,7 @@ downloads the newest version, checks its checksum, and swaps it in the next time
 
 ## Your first ten minutes
 
-1. Start SimpleBrain: an ordinary window you open from its icon. A 2-minute tour walks you through each part with one thing to try; the **How to**
+1. Start SimpleBrain: an ordinary window you open from its icon. A five-minute tutorial walks you through each part, and you do one real thing at each step; the **How to**
    button at the top runs it again any time.
 2. In the bar at the top type `t call mom fri` and press Enter. That's a task, due Friday.
 3. Type `c tomorrow 2pm coffee with Dad` and press Enter. That's on the calendar.
@@ -89,6 +101,7 @@ log lives in the settings folder, never your notes. What it does with that:
   opens beside your notes) or **Taking a break** (quiet for 15 minutes). Quiet during calendar events with *shift* or
   *work* in the title.
 - 90 minutes at the screen without five minutes away → one card to stand up.
+- Don't want the cards? Put `nudges:: off` on a line in Home. Time left and the day's three still show.
 - Back after 15 minutes away → Today's first thing is already open.
 - The top bar shows how many of today's three you've ticked done and, with a `limit::` line, the time left. Time in
   front of a window is never counted as work (anyone can sit in front of a window); the score is what you ticked.
@@ -205,8 +218,8 @@ time on any system.
 - **Rename and broken links:** the pencil next to a note in the list renames it and
   rewrites every `[[link]]` to it, in other notes, the Inbox and the Calendar. **File → Broken links…**
   lists links to notes that don't exist (a typo shows up there); double-click one to open a note that uses it.
-- **Tour:** the first launch walks through the window one feature at a time (Back / Next / Skip,
-  arrow keys, Esc). **Help → Take the tour** runs it again.
+- **Tutorial:** the first launch walks through the window one part at a time, and you do each step for real
+  (a task, an event, a note, a book note). **Help → Take the tour** runs it again.
 - **Tasks:** any line like `t call the bank due:10-01-2026` in any note
   shows up under Overdue / Today / Upcoming / No date. Ticking it makes it
   `- [x] …`; old `- [ ] …` lines are converted to `t …` automatically.
@@ -242,6 +255,13 @@ time on any system.
   traffic, so they never see your notes. Anyone who has your code can join your
   notes, so keep it to yourself; **New code** replaces it. The calendar link in
   `.config`, generated notes (Recommendations, Answers) and the trash are never sent.
+- **Studying a book:** **+ New Learning Note** makes a page that takes you through a book in three short sittings.
+  *First look* (20 minutes): your purpose, a one-sentence guess at what the book says, the words that keep coming up,
+  and 3 to 5 questions. Then stop and sleep on it. *Find the answers* (the next day, 25 minutes): one question at a
+  time with a timer, and each answer typed in your own words with the book closed, then checked. *Say it back* (two
+  days later, 20 minutes): two minutes out loud from memory, fix what was wrong, and one thing you'll do with a date.
+  Then two five-minute checks from memory, a week and a month on. Only the next sitting is a task; ticking it writes
+  the one after on its day.
 - **Book recommendations:** a note made with **+ New Learning Note** is a book;
   put its keywords under *Trigger Words or Phrases* in double square brackets.
   SimpleBrain suggests books in a `Recommendations` note, rebuilt in the
@@ -312,7 +332,7 @@ gone missing. The sync test runs a two-device sync over localhost, no internet n
 `QT_QPA_PLATFORM=offscreen python tests/stress.py` times every action on a 3,000-note vault and feeds it odd files. `install.sh` puts the app
 in `~/.local/share/simplebrain/app`, adds it to your app menu and adds a
 `simplebrain` command. Run it again after a rebuild to update. The installed build also updates itself from the newest
-GitHub release (through your `gh` login while the repo is private, or GitHub's public API once it isn't). To run from
+GitHub release. To run from
 source without installing: `python simplebrain_app.py`.
 
 Portable AppImage: after `pyinstaller`, run `packaging/linux/build-appimage.sh`. Release builds use
@@ -332,7 +352,7 @@ iscc /DAppVersion=<VERSION from simplebrain_core.py> packaging\windows\simplebra
 - `simplebrain_today.py`: the Today note: three things, plan workbook, people, favorite problems, free time. No UI.
 - `simplebrain_find.py`: find anything from the top bar (notes, files, apps, open windows). No UI.
 - `simplebrain_habits.py`: what you open and when, kept on this computer, to rank search and Today. No UI.
-- `simplebrain_desk.py`: the Linux desktop side: open beside the note, Super+J, desktop setup and undo. No UI.
+- `simplebrain_desk.py`: the Linux desktop side: open a file beside its note, the list of open windows, video time. No UI.
 - `simplebrain_glass.py`: the Glass theme and clickable links in the editor (Qt).
 - `simplebrain_money.py`: the money view (Qt).
 - `simplebrain_watch.py`: the watcher: drift, time left, breaks, the day's three, the score. No UI.

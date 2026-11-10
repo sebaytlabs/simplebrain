@@ -30,7 +30,9 @@ def links_in(line):
     for m in LINK_RE.finditer(line):
         t = m.group()
         if t.startswith("[["):
-            out.append((m.start(), m.end(), "note", t[2:-2].strip()))
+            target = t[2:-2].split("|")[0].split("#")[0].strip()  # [[Note|shown text]], [[Note#Heading]]
+            if target:
+                out.append((m.start(), m.end(), "note", target))
         else:
             t = t.rstrip(".,;:!?")  # the sentence's full stop isn't part of the address
             out.append((m.start(), m.start() + len(t), "url", t))

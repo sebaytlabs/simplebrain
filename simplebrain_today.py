@@ -114,7 +114,6 @@ def feeds(text, qs):
 
 # ---------- the plan workbook (Money-Plan.xlsx): read where it is, never imported ----------
 
-PLAN_DIRS = ("~/Desktop", "~/Documents")  # where a plan workbook is looked for when Home doesn't name one
 PLAN_LINE = re.compile(r"^\s*plan::\s*(.+?)\s*$", re.MULTILINE)
 
 _NS = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
@@ -185,35 +184,18 @@ def _cell_date(v):
     return None
 
 
-def find_plan(dirs=None, depth=3):
-    """The newest .xlsx with 'plan' in its name a few folders down from Desktop or Documents, or None."""
-    dirs = dirs or PLAN_DIRS  # looked up when called, so a test can point it at a throwaway folder
-    best = None
-    for top in dirs:
-        top = os.path.expanduser(top)
-        for d, sub, files in os.walk(top):
-            if d[len(top):].count(os.sep) >= depth:
-                sub[:] = []
-            sub[:] = [x for x in sub if not x.startswith(".")]
-            for f in files:
-                if f.lower().endswith(".xlsx") and "plan" in f.lower() and not f.startswith((".", "~$")):
-                    p = os.path.join(d, f)
-                    if best is None or os.path.getmtime(p) > os.path.getmtime(best):
-                        best = p
-    return best
-
-
-def plan_path(vault=None, dirs=None):
-    """A `plan:: path` line in Home, else a plan workbook found in Desktop/Documents, else None."""
+def plan_path(vault=None):
+    """The workbook a `plan:: path` line in Home or Settings names, or None. Only ever the one you name: SimpleBrain
+    doesn't go looking through your folders for spreadsheets."""
     vault = vault or core.VAULT
     try:
         m = PLAN_LINE.search(core.settings_text(vault))
     except OSError:
         m = None
-    if m:
-        path = os.path.normpath(core.resolve_file(m.group(1), vault))  # one slash style, on Windows too
-        return path if os.path.isfile(path) else None
-    return find_plan(dirs)
+    if not m:
+        return None
+    path = os.path.normpath(core.resolve_file(m.group(1), vault))  # one slash style, on Windows too
+    return path if os.path.isfile(path) else None
 
 
 # ---------- plan actions ticked in SimpleBrain (the workbook itself is never written) ----------
@@ -731,15 +713,12 @@ def _write_xlsx(path, rows, sheet="Checklist"):
 def selftest():
     import shutil
     import tempfile
-    global PLAN_DIRS
     v = tempfile.mkdtemp()
     watch_tmp = tempfile.mkdtemp()  # the watcher's day log: never the real one
     real_log_dir = watch.log_dir
     watch.log_dir = lambda base=None: real_log_dir(base or watch_tmp)
-    # nothing of the real computer: no plan workbook from the real Desktop/Documents (it filled Today with real
-    # actions on a real machine), no real 'ticked in SimpleBrain' list, no real habit log
-    real_plan_dirs, real_cfg, real_habits = PLAN_DIRS, core.user_config_dir, habits.log_path
-    PLAN_DIRS = (os.path.join(watch_tmp, "Desktop"), os.path.join(watch_tmp, "Documents"))
+    # nothing of the real computer: no real 'ticked in SimpleBrain' list, no real habit log
+    real_cfg, real_habits = core.user_config_dir, habits.log_path
     core.user_config_dir = lambda: watch_tmp
     habits.log_path = lambda: os.path.join(watch_tmp, "habits.log")
     try:
@@ -811,7 +790,8 @@ def selftest():
         assert home_short("/media/a.pdf") == "/media/a.pdf"  # outside home: as it was
         assert len(re.findall(r"^## \d\. ", text, re.M)) == 3  # still three, never more
         assert "Jarvis drafts" not in text and "Later thing" not in text and "Run setup" not in text
-        assert find_plan([v]) == wb and find_plan([os.path.join(v, "media")]) is None
+        core.write_note("Elsewhere.md", "# Elsewhere\n", os.path.join(v, "empty")) if os.makedirs(os.path.join(v, "empty"), exist_ok=True) is None else None
+        assert plan_path(os.path.join(v, "empty")) is None  # no plan:: line, no plan: a workbook lying around is never picked up
         assert cards_for("Call the lender: request REFINANCING", wb) == [
             os.path.join(pdir, "cards", "car-loan-refinance.md")]
         bad = os.path.join(v, "bad.xlsx")
@@ -956,7 +936,7 @@ def selftest():
         assert "## 1. Python module (every day)" in text and "3h 00m at the computer today" in text and "free stretch" not in text
         shutil.rmtree(hv, ignore_errors=True)
     finally:
-        PLAN_DIRS, core.user_config_dir, habits.log_path = real_plan_dirs, real_cfg, real_habits
+        core.user_config_dir, habits.log_path = real_cfg, real_habits
         watch.log_dir = real_log_dir
         shutil.rmtree(watch_tmp, ignore_errors=True)
         shutil.rmtree(v, ignore_errors=True)

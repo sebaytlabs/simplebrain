@@ -30,7 +30,8 @@ def roots():
         out += [f"{d}:\\" for d in string.ascii_uppercase[3:] if os.path.isdir(f"{d}:\\")]
     for base in (f"/media/{os.environ.get('USER', '')}", "/mnt", "/Volumes"):
         try:
-            out += [os.path.join(base, d) for d in sorted(os.listdir(base))]
+            out += [p for d in sorted(os.listdir(base))
+                    if os.path.realpath(p := os.path.join(base, d)) not in ("/", os.path.realpath(home))]
         except OSError:
             pass
     return out

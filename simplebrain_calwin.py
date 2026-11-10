@@ -200,7 +200,7 @@ class CalendarWindow(QDialog):
         for e in events:
             self.month.setDateTextFormat(qd(e["date"]), bold)
         self.status.setText("" if self.cal else "Only SimpleBrain's own events: connect a CalDAV calendar to see and "
-                                                "change the rest (File > Calendar…).")
+                                                "change the rest (Link… in the Calendar panel).")
         self.show_days()
 
     def show_days(self):

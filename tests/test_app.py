@@ -162,7 +162,7 @@ w.on_edit_task(t)
 assert "- [x] ship it v2 due:2020-02-03" in w.editor.toPlainText()
 w.ask_text = lambda *_a: "bad date due:13-01-2020"
 w.on_edit_task([t for t in core.parse_tasks() if t["file"] == "Project X.md"][0])
-assert "isn't a valid date" in w._err and "bad date" not in core.read_note("Project X.md")
+assert "isn't a date" in w._err and "bad date" not in core.read_note("Project X.md")
 # the graph is centered on the open note, and re-centers when another note opens
 w.open_note("Home.md")
 assert w.graph._to is not None  # the picture glides to the new center...
@@ -531,15 +531,6 @@ rows = [w.tasks_list.item(i).text() for i in range(w.tasks_list.count())]
 assert any(r.startswith("…and ") and "more" in r for r in rows) and w.tasks_list.count() < 160
 core.delete_note("Lots.md")
 w.refresh_tasks()
-# one-time tidy-up after the trial version: runs once, without asking, originals to the trash
-core.write_note("Clips.md", "# Clips\n#mission\n\n" + A.updater.TRIAL_GO_LINE + "\n\nt Clips ▸ Session 00 due:2026-11-01\nfile:: /x/a.mp4\n")
-core.add_local_event("2026-11-01", "19:00", "Clips ▸ Session 00 [[Clips]]")
-s = core.load_settings()
-s.pop("missions_trial_cleaned", None)
-core.save_settings(s)
-msg = w.clean_up_after_update()
-assert "1 task and 1 calendar event taken out of Clips" in msg and "## Session 00\nfile:: /x/a.mp4" in core.read_note("Clips.md")
-assert not any("Clips" in e["title"] for e in core.read_local_events()) and w.clean_up_after_update() == ""
 w.start_update_check()  # tests never update: SIMPLEBRAIN_NO_UPDATE
 assert not w._update_pending and "off" in w.update_state  # Help > About says where updates stand
 w.on_update_done("")  # an update landed: it waits for you to step away, never restarts mid-typing
@@ -1263,7 +1254,11 @@ mw.close()
 w.open_today()
 assert "**Money:** " in w.editor.toPlainText()
 # drop it and it's filed: PARA folders under home, linked from the matching note, Undo puts it back
-assert w.para and os.path.isdir(os.path.join(w.para, "Drop"))
+assert w.para and not os.path.exists(os.path.join(w.para, "Drop")) and w._drop_watch is None  # nothing made at start
+A.QDesktopServices.openUrl, _open_url = (lambda *_a: True), A.QDesktopServices.openUrl
+w.open_drop_folder()  # first use makes it and starts watching
+A.QDesktopServices.openUrl = _open_url
+assert os.path.isdir(os.path.join(w.para, "Drop")) and w._drop_watch is not None
 os.makedirs(os.path.join(w.para, "Projects", "walker-supply"), exist_ok=True)
 dropped = os.path.join(HOME, "walker supply lease.pdf")
 open(dropped, "w").close()

@@ -24,9 +24,8 @@ SHOP_FILE = "shopify.json"  # {"shop": "xxx.myshopify.com", "client_id", "client
 STATE_FILE = ".publish-state.json"  # {note file: {"id", "handle", "hash"}} so a changed note updates its page, not duplicates it
 INDEX_FILE = "\0index"  # state key for the generated list-of-notes page
 INDEX_TITLE = "Notes"
-INDEX_INTRO = ("<p>These are our own notes, written in SimpleBrain and published here the moment we save them. "
-               "Most are reading notes, taken with the photoreading method: skim the whole book first, then "
-               "write down what you actually want from it. They're raw and they change as we learn more.</p>")
+INDEX_INTRO = "Notes, published as they're written."  # what the list of notes says at its top, unless you say otherwise
+INTRO_LINE = re.compile(r"^\s*website intro::\s*(.+?)\s*$", re.I | re.M)  # in Home or Settings: your own words there
 INDEX_HANDLE = "notes"
 SITE_FILE = "website.json"  # {"kind": "wordpress" | "shopify" | "folder" | "off", ...}; per-user config folder, never the vault
 KINDS = {"wordpress": ("url", "user", "password"), "shopify": ("shop", "client_id", "client_secret"), "folder": ("folder",)}
@@ -97,6 +96,16 @@ def access_token(cfg, opener=urllib.request.urlopen):
         return json.load(r)["access_token"]
 
 
+def index_intro(vault=None):
+    """The line at the top of the published list of notes: a `website intro:: …` line in Home or Settings, else a
+    plain default."""
+    try:
+        m = INTRO_LINE.search(core.settings_text(vault or core.VAULT))
+    except OSError:
+        m = None
+    return "<p>" + html.escape(m.group(1) if m else INDEX_INTRO) + "</p>"
+
+
 def slug(title):
     s = re.sub(r"[^\w]+", "-", title.lower(), flags=re.UNICODE).strip("-_")
     return s or hashlib.sha1(title.encode()).hexdigest()[:8]
@@ -110,9 +119,11 @@ def _inline(s, link_for):
     s = re.sub(r"\[([^\]]+)\]\((https?://[^)\s]+)\)", r'<a href="\2">\1</a>', s)
 
     def wiki(m):
-        title = html.unescape(m.group(1)).strip()
+        inner = html.unescape(m.group(1))
+        title = core.link_target(inner)
+        shown = html.escape(inner.split("|", 1)[1].strip() if "|" in inner else inner.strip(), quote=False)
         url = link_for(title)
-        return f'<a href="{html.escape(url)}">{m.group(1)}</a>' if url else m.group(1)  # a private note is plain text, not a dead link
+        return f'<a href="{html.escape(url)}">{shown}</a>' if url else shown  # a private note is plain text, not a dead link
     return core.WIKILINK_RE.sub(wiki, s)
 
 
@@ -170,8 +181,10 @@ def md_to_html(text, link_for):
 
 
 def strip_private(text):
-    """Lines that only make sense inside the app: tasks and the inbox/calendar shorthand."""
-    return "\n".join(l for l in text.split("\n") if not re.match(r"\s*([tic]\s+\S|file::)", l))
+    """Lines that only make sense inside the app: tasks, the inbox/calendar shorthand, and the Learning Note's own
+    guidance lines (word for word, so a reader's page shows the notes and not how to take them)."""
+    return "\n".join(l for l in text.split("\n") if not re.match(r"\s*([tic]\s+\S|file::)", l)
+                     and l.strip() not in core.LEARNING_HINTS)
 
 
 def graphql(shop_cfg, query, variables, opener=urllib.request.urlopen):
@@ -358,7 +371,7 @@ def publish(vault=None, cfg=None, opener=urllib.request.urlopen):
         title = core.note_title(n)
         body = md_to_html(strip_private(core.read_note(n, vault)), link_for)
         pages[n] = (title, handles[title], body)
-    listing = INDEX_INTRO + "<ul>" + "".join(f'<li><a href="{html.escape(site.link(h))}">{html.escape(t)}</a></li>'
+    listing = index_intro(vault) + "<ul>" + "".join(f'<li><a href="{html.escape(site.link(h))}">{html.escape(t)}</a></li>'
                                              for t, h, _ in sorted(pages.values())) + "</ul>"
     pages[INDEX_FILE] = (INDEX_TITLE, INDEX_HANDLE, listing)
     created = updated = deleted = 0
@@ -405,6 +418,9 @@ def selftest():
     assert md_to_html("```\n<a>\n```", links) == "<pre><code>&lt;a&gt;</code></pre>"
     assert slug("My Note: 2026!") == "my-note-2026" and len(slug("!!!")) == 8
     assert strip_private("keep\nt call bank due:10-01-2026\ni idea\nc 10-05-2026 meet\nthe cat") == "keep\nthe cat"
+    book = strip_private(core.learning_note_template("Deep Work").replace("answer::\n", "answer:: (my own words)\n", 1))
+    assert not any(h in book for h in core.LEARNING_HINTS) and "First look" not in book  # the notes only
+    assert "## Your Initial Purpose::" in book and "answer:: (my own words)" in book and "(my own line)" in strip_private("(my own line)")
     calls, store = [], {}
 
     def fake(req, timeout=0):

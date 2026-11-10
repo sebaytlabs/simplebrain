@@ -12,7 +12,7 @@ one-letter tasks/inbox/calendar. PySide6 desktop app for Linux, one user.
 - `simplebrain_today.py`: the generated Today note (three things from tasks + the `plan::` workbook, their files and call cards, favorite problems, people, free stretch, calendar, habits). Not synced (its MARK). Runs its own selftest.
 - `simplebrain_find.py`: the top bar's search (notes, open windows, apps, a cached file list of home + mounted drives). Runs its own selftest.
 - `simplebrain_habits.py`: local log of what's opened through SimpleBrain, in the settings folder (never the vault). Runs its own selftest.
-- `simplebrain_update.py`: self-updates (git fast-forward of a checkout, or the newest release for the installed build) and one-time clean-ups after an update (`undo_missions_trial`). Runs its own selftest, including a real git update in temp repos. Tests set `SIMPLEBRAIN_NO_UPDATE`.
+- `simplebrain_update.py`: self-updates (git fast-forward of a checkout, or the newest release for the installed build). Runs its own selftest, including a real git update in temp repos. Tests set `SIMPLEBRAIN_NO_UPDATE`.
 - `simplebrain_glass.py`: the Glass theme (warm dark background of its own, never the wallpaper; gold accent: never neon/cyan; no clock, the panel has one) and clickable links in the editor.
 - `simplebrain_money.py`: the money view (`MoneyView`, `MoneyWindow`), in Glass's warm gold.
 - One look: Glass. The user asked for a single theme: no Theme box, no other themes, nothing that switches it.
@@ -27,7 +27,7 @@ one-letter tasks/inbox/calendar. PySide6 desktop app for Linux, one user.
 - `simplebrain_calendar.py`: the whole calendar over CalDAV (events with place/notes in a range, create, edit, delete, skip one date of a series). Runs its own selftest against a fake CalDAV server.
 - `simplebrain_calwin.py`: the Calendar window (Qt): month, the picked day and the week after, add/edit/delete.
 - `tools/supervise.py`: runs every selftest and the app test and checks `CHECKLIST.md`'s proofs. `tests/stress.py`: timings on a 3,000-note vault and odd input.
-- `simplebrain_desk.py`: the X11/Xfce side: open a file beside its note (mpv, xdg-open, browser --new-window, wmctrl), mpv's time over its IPC socket, `integrate`/`unintegrate` (autostart `--desktop` + Super+J `--toggle` via xfconf) and missing tools via pkexec. Runs its own selftest; its integrate test uses a temp home and a fake xfconf.
+- `simplebrain_desk.py`: the X11/Xfce side: open a file beside its note (mpv, xdg-open, browser --new-window, wmctrl), mpv's time over its IPC socket. Runs its own selftest.
 - `simplebrain_app.py`: the Qt window (`GraphView`, `SimpleBrain`). The layout is the user's: add hooks, never rearrange panels. One running copy: `--toggle` and a plain start are handed to it over a local socket; `--desktop` makes the window the desktop layer.
 - `tests/test_app.py`: headless end-to-end check in a throwaway vault.
 - `packaging/`: PyInstaller spec, AppImage and install scripts.
@@ -48,7 +48,6 @@ one-letter tasks/inbox/calendar. PySide6 desktop app for Linux, one user.
 - Match the surrounding code: terse comments that say why, no new dependency for a few lines.
 - New logic gets an assert in the selftest or in `tests/test_app.py`.
 - Fewer steps than doing it by hand, or it doesn't ship. No game words (missions, XP, ranks), no imports that flood tasks or the calendar, never more than 3 things to do on screen.
-- Never run `desk.integrate` against the real desktop from a test.
 - Nothing personal in code: paths come from notes (`plan::`, `file::`) or are searched for. It's meant to be open-sourced.
 - Qt stays below 6.10 (constraints.txt): 6.10+ won't start on pre-SSE4.2 processors, and old computers must work.
 - Releases: bump `VERSION` in simplebrain_core.py; a push to main with a new VERSION publishes the release that installed copies update to.

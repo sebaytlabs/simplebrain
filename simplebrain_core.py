@@ -26,7 +26,7 @@ from datetime import date, datetime, timedelta
 
 from simplebrain_ics import parse_ics
 
-VERSION = "0.5.4"
+VERSION = "0.6.0"
 
 INBOX_FILE = "Inbox.md"
 CALENDAR_FILE = "Calendar.md"
@@ -714,8 +714,14 @@ def set_public(filename, on, vault=None):
     save_settings(data, path)
 
 
+def link_target(inner):
+    """The note a link points at: '[[Note|shown text]]' and '[[Note#Heading]]' both mean Note (as in Obsidian)."""
+    return inner.split("|")[0].split("#")[0].strip()
+
+
 def parse_links(text):
-    return [m.group(1).strip() for m in WIKILINK_RE.finditer(text)]
+    """The notes a text links to, in order. A link to a heading of the note itself ('[[#Heading]]') names none."""
+    return [t for m in WIKILINK_RE.finditer(text) if (t := link_target(m.group(1)))]
 
 
 FILE_RE = re.compile(r"^\s*file::\s*(.+?)\s*$", re.MULTILINE)
@@ -781,7 +787,8 @@ def rename_note(filename, new_title, vault=None):
     changed = 0  # links last: if this is cut short, Broken links lists what is left
     for n in list_notes(vault):
         text = read_note(n, vault)
-        fixed = WIKILINK_RE.sub(lambda m: f"[[{new_title}]]" if m.group(1).strip() == old_title else m.group(0), text)
+        fixed = WIKILINK_RE.sub(lambda m: m.group(0) if link_target(m.group(1)) != old_title else
+                                "[[" + new_title + m.group(1)[len(m.group(1).split("|")[0].split("#")[0]):] + "]]", text)
         if fixed != text:
             write_note(n, fixed, vault)
             changed += n != new_file
@@ -811,23 +818,73 @@ def should_start_ics_fetch(sync, syncing, fetch_attempted):
     return not syncing and (sync or not fetch_attempted)
 
 
-def learning_note_template(title):
-    """A book-study note: Prepare / Preview / Postview / Your Questions /
-    Activation / Next Steps."""
+# A book is studied in three short sittings and two checks from memory. Only the next one is ever a task: ticking
+# it writes the one after, due this many days later (toggle_task), so a book never floods the list and the gaps
+# follow what was really done. The questions are written a day before their answers, every answer is typed with the
+# book closed and then checked, and the checks come back spaced out: asking first, recalling and spacing are what
+# make reading stick.
+LEARNING_SITTINGS = (  # (days after the one before was ticked, the task)
+    (0, "First look, 20 minutes"),
+    (1, "Find the answers, 25 minutes"),
+    (2, "Say it back, 20 minutes"),
+    (7, "Check from memory, a week on"),
+    (21, "Check from memory, a month on"),
+)
+# The template's own guidance lines. Kept out of a published page (publish.strip_private), word for word, so
+# nothing the user wrote is ever dropped.
+LEARNING_HINTS = (
+    "(Three short sittings and two checks. Tick the task below when it's done and the next one appears on its "
+    "day. One book at a time works best. After a sitting, take five quiet minutes away from the screen.)",
+    "(First look. Finish the line: I want ... so that I can ...)",
+    "(One minute with the cover and the contents: how is the book built, and what's your guess at what it says?)",
+    "(After your first pass through the whole book: 10 to 25 words that keep coming up.)",
+    "(3 to 5 things you want this book to answer, why and how questions most of all. Type each question after its "
+    "number, its answer after answer::. Leave the answers empty today and sleep on it.)",
+    "(Find the answers, the next day. One question at a time, five minutes each, with a timer:",
+    "1) Say your guess before you look. A wrong guess still helps.",
+    "2) Pick the chapter that should hold it, from the contents or the index.",
+    "3) Run your eyes down the middle of its pages. If something pulls you, go there. If nothing does, read the "
+    "first sentence of each paragraph.",
+    "4) Read the page or two that answers it at your normal pace. Going back over a hard sentence is fine.",
+    "5) Close the book. Type the answer in your own words after answer::, with the page number and why it matters "
+    "to you. Then open the book and check it.",
+    "Out of time? Type \"not found yet\" and go on to the next question.)",
+    "(Say it back, two days later, with the book closed: two minutes out loud, as if telling a friend what the book "
+    "says and what you're taking from it. Then cover your answers and answer each question again. Fix what you "
+    "got wrong and look up anything still \"not found yet\".)",
+    "(The two checks: cover your answers and answer every question from memory. Look up any you miss, cover it, "
+    "and answer it again, until each one has come out right once.)",
+)
+
+
+def learning_note_template(title, today=None):
+    """A book-study note: Prepare / Preview / Postview / Your Questions / Activation / Next Steps, with the
+    sittings as dated tasks at the top (LEARNING_SITTINGS) and one line of guidance per part (LEARNING_HINTS)."""
+    today = today or date.today()
+    h = LEARNING_HINTS
+    sittings = f"t {LEARNING_SITTINGS[0][1]}: {title} due:{today.isoformat()}\n"
     return (
         f"# {title}\n\n"
         "[[Home]]\n\n"
+        f"{h[0]}\n{sittings}\n"
         "# Prepare\n"
+        f"{h[1]}\n"
         "## Your Initial Purpose::\n\n\n"
         "# Preview\n"
+        f"{h[2]}\n"
         "## One Sentence Summary::\n\n\n"
         "# Postview\n"
+        f"{h[3]}\n"
         "## Trigger Words or Phrases:: (put each one in double square brackets to link it)\n\n\n"
         "# Your Questions\n"
-        "(type each question after its number, its answer after answer::)\n"
+        f"{h[4]}\n"
         + "".join(f"{i}.\nanswer::\n\n" for i in range(1, 6)) + "\n"
         "# Activation\n"
-        "## Your New Purpose, if it has changed::\n\n\n"
+        + "\n".join(h[5:12]) + "\n\n"
+        f"{h[12]}\n"
+        "## One Sentence Summary, Now::\n\n"
+        "## Your New Purpose, if it has changed::\n\n"
+        f"{h[13]}\n\n\n"
         "# Next Steps\n"
         "## What you'll do with this:: (one per line: t task due:MM-DD-YYYY, i for the Inbox, c MM-DD-YYYY event for the Calendar)\n"
     )
@@ -927,9 +984,9 @@ def natural_date(s, today=None):
     11-5 (this year, or next once it's passed). None if it isn't one."""
     today = today or date.today()
     t = " ".join(str(s).strip().lower().replace(",", " ").split())
-    if t in ("today", "tod", "tonight"):
+    if t in ("today", "tonight"):
         return today
-    if t in ("tomorrow", "tmrw", "tmr", "tom"):
+    if t in ("tomorrow", "tmrw", "tmr"):  # not "tom": that's someone's name
         return today + timedelta(days=1)
     m = re.fullmatch(r"in (\d{1,3}) (day|week|month)s?", t)
     if m:
@@ -1243,13 +1300,27 @@ def next_due(rule, after):
     return after + timedelta(days=(wd - after.weekday() - 1) % 7 + 1)
 
 
+def next_sitting(body, lines, today):
+    """The task line that follows a ticked sitting of a book ('First look, 20 minutes: Deep Work' -> 'Find the
+    answers …' due tomorrow), or None: not a sitting, the last one, or the next is already in the note."""
+    for i, (_, what) in enumerate(LEARNING_SITTINGS[:-1]):
+        if body.startswith(what + ": "):
+            title = DUE_RE.sub("", body[len(what) + 2:]).strip()
+            gap, then = LEARNING_SITTINGS[i + 1]
+            if not title or any(f"{then}: {title}" in l for l in lines):
+                return None
+            return f"t {then}: {title} due:{(today + timedelta(days=gap)).isoformat()}"
+    return None
+
+
 def toggle_task(task, vault=None, today=None):
     """Tick a task done (or back). A repeating one (`every:day`, `every:weekday`, `every:week`, `every:mon` …) stays
     open and moves to its next date: done today, back tomorrow. Returns the new due date for a repeat, else None."""
     vault = vault or VAULT
     today = today or date.today()
-    lines = read_note(task["file"], vault).splitlines()
-    m = TASK_RE.match(lines[task["line"]])
+    lines, m = _matching_line(task["file"], task["line"], TASK_RE, 4, task["text"], vault)
+    if not m:
+        return None  # the note changed since the list was drawn: the refreshed list shows what's there now
     rep = REPEAT_RE.search(m.group(4))
     if rep and not task["done"]:
         due = DUE_RE.search(m.group(4))
@@ -1260,6 +1331,8 @@ def toggle_task(task, vault=None, today=None):
         write_note(task["file"], "\n".join(lines) + "\n", vault)
         return nxt
     lines[task["line"]] = m.group(1) + ("t " if task["done"] else "- [x] ") + m.group(4)
+    if not task["done"] and (then := next_sitting(m.group(4), lines, today)):
+        lines.insert(task["line"] + 1, m.group(1) + then)  # a book's next sitting, on its day
     write_note(task["file"], "\n".join(lines) + "\n", vault)
     return None
 
@@ -1432,21 +1505,21 @@ def add_inbox_item(text, vault=None):
 
 
 def _rewrite_inbox_line(item, new_line, vault=None):
+    """False (nothing written) when that line no longer holds this item: the Inbox changed since it was listed."""
     vault = vault or VAULT
-    lines = read_note(INBOX_FILE, vault).splitlines()
+    lines, m = _matching_line(INBOX_FILE, item["line"], INBOX_PENDING_RE, 1, item["text"], vault)
+    if not m:
+        return False
     lines[item["line"]] = new_line
     write_note(INBOX_FILE, "\n".join(lines) + ("\n" if lines else ""), vault)
+    return True
 
 
 def edit_inbox_item(item, new_text, vault=None):
     """Replace a pending Inbox item's text. False (nothing written) if that
     line no longer holds this item."""
     vault = vault or VAULT
-    _, m = _matching_line(INBOX_FILE, item["line"], INBOX_PENDING_RE, 1, item["text"], vault)
-    if not m:
-        return False
-    _rewrite_inbox_line(item, _inbox_line(new_text), vault)
-    return True
+    return _rewrite_inbox_line(item, _inbox_line(new_text), vault)
 
 
 def delete_inbox_item(item, vault=None):
@@ -1462,13 +1535,15 @@ def delete_inbox_item(item, vault=None):
 def classify_as_task(item, due, vault=None):
     vault = vault or VAULT
     suffix = f" due:{due}" if due else ""
-    _rewrite_inbox_line(item, f"t {item['text']}{suffix}", vault)
+    return _rewrite_inbox_line(item, f"t {item['text']}{suffix}", vault)
 
 
 def classify_as_event(item, event_date, event_time, vault=None):
     vault = vault or VAULT
-    _rewrite_inbox_line(item, f"- [-] {item['text']}", vault)
+    if not _rewrite_inbox_line(item, f"- [-] {item['text']}", vault):
+        return False
     add_local_event(event_date, event_time, item["text"], vault)
+    return True
 
 
 def classify_as_note(item, vault=None):
@@ -1476,6 +1551,8 @@ def classify_as_note(item, vault=None):
     numbered if taken) and marks the Inbox line filed. Returns the filename."""
     vault = vault or VAULT
     text = item["text"]
+    if not _matching_line(INBOX_FILE, item["line"], INBOX_PENDING_RE, 1, text, vault)[1]:
+        return None  # the Inbox changed since it was listed: nothing made
     title = "".join(" " if c in BAD_TITLE_CHARS else c for c in text.splitlines()[0])
     title = " ".join(title.split())[:60].rstrip(". ") or "Thought"
     if title in (".", ".."):
@@ -1768,55 +1845,17 @@ def upcoming_events(vault=None, days=14, ics_text=None, today=None):
     return events
 
 
-# ---------- self-update (installed build only; uses the user's own `gh` login, the repo is private) ----------
+# ---------- self-update: the pieces simplebrain_update builds on ----------
 
 REPO = "sebaytlabs/simplebrain"
-ASSET = "SimpleBrain-x86_64.AppImage"
 
 
 def version_key(tag):
     return tuple(int(n) for n in re.findall(r"\d+", tag))
 
 
-def latest_release():
-    """Tag of the newest GitHub release, or None when gh is missing, logged out or offline."""
-    if not shutil.which("gh"):
-        return None
-    try:
-        r = subprocess.run(["gh", "release", "view", "--repo", REPO, "--json", "tagName", "-q", ".tagName"],
-                           capture_output=True, text=True, timeout=20)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    tag = r.stdout.strip()
-    return tag if r.returncode == 0 and re.fullmatch(r"v?\d+(\.\d+)*", tag) else None
-
-
 def update_available(tag, current=None):
     return bool(tag) and version_key(tag) > version_key(current or VERSION)
-
-
-def install_update(tag, dest=None):
-    """Download the release AppImage with gh, check its sha256, and swap its app folder into `dest`
-    (the running install). Returns "" on success, else the reason it failed; `dest` is left
-    untouched on any failure."""
-    work = tempfile.mkdtemp(prefix="simplebrain-update-")
-    try:
-        for pattern in (ASSET, ASSET + ".sha256"):
-            r = subprocess.run(["gh", "release", "download", tag, "--repo", REPO, "--pattern", pattern,
-                                "--dir", work], capture_output=True, text=True, timeout=600)
-            if r.returncode:
-                return "download failed: " + r.stderr.strip()
-        image = os.path.join(work, ASSET)
-        with open(image + ".sha256", encoding="utf-8") as f:
-            want = f.read().split()[0]
-        with open(image, "rb") as f:
-            if hashlib.sha256(f.read()).hexdigest() != want:
-                return "checksum mismatch, nothing installed"
-        return install_update_from(image, dest)
-    except (OSError, subprocess.SubprocessError, ValueError) as e:
-        return str(e)
-    finally:
-        shutil.rmtree(work, ignore_errors=True)
 
 
 def install_update_from(image, dest=None):
@@ -2110,26 +2149,32 @@ def selftest():
         parse_ics(busy, today=date(2026, 12, 20))
         assert time.time() - t0 < 5  # a per-second recurrence must not freeze the app  # one odd event doesn't blank the feed
     assert update_available("v0.10.0", "0.9.1") and not update_available("v0.2.0", "0.2.0") and not update_available(None)
-    if os.name == "posix":  # the fake gh/AppImage are shell scripts
-        with tempfile.TemporaryDirectory() as d:  # install_update against a fake `gh` and AppImage
+    if os.name == "posix":  # the fake AppImage is a shell script
+        with tempfile.TemporaryDirectory() as d:  # install_update_from: a checked download swapped in, the old one gone
             image = "#!/bin/sh\nmkdir -p squashfs-root/SimpleBrain && echo '#!/bin/sh' > squashfs-root/SimpleBrain/SimpleBrain && chmod +x squashfs-root/SimpleBrain/SimpleBrain\n"
-            os.makedirs(os.path.join(d, "bin"))
             os.makedirs(os.path.join(d, "app"))
             with open(os.path.join(d, "img"), "w") as f:
                 f.write(image)
-            digest = hashlib.sha256(image.encode()).hexdigest()
-            gh = ("#!/bin/sh\nwhile [ $# -gt 0 ]; do case $1 in --pattern) p=$2;; --dir) o=$2;; esac; shift; done\n"
-                  f"case $p in *.sha256) echo '{digest}  x' > \"$o/$p\";; *) cp '{d}/img' \"$o/$p\";; esac\n")
-            with open(os.path.join(d, "bin", "gh"), "w") as f:
-                f.write(gh)
-            os.chmod(os.path.join(d, "bin", "gh"), 0o755)
-            old_path, os.environ["PATH"] = os.environ["PATH"], os.path.join(d, "bin") + os.pathsep + os.environ["PATH"]
-            try:
-                assert install_update("v9.9.9", os.path.join(d, "app")) == ""
-                assert os.access(os.path.join(d, "app", "SimpleBrain"), os.X_OK)
-                assert not os.path.exists(os.path.join(d, "app.old"))
-            finally:
-                os.environ["PATH"] = old_path
+            assert install_update_from(os.path.join(d, "img"), os.path.join(d, "app")) == ""
+            assert os.access(os.path.join(d, "app", "SimpleBrain"), os.X_OK)
+            assert not os.path.exists(os.path.join(d, "app.old"))
+    assert natural_date("tom") is None and trailing_date("call Tom", date(2026, 11, 9)) == ("call Tom", None)
+    assert natural_date("tmrw", date(2026, 11, 9)) == date(2026, 11, 10)
+    assert parse_links("[[Note|shown]] [[Other#Part]] [[#here]] [[ Plain ]]") == ["Note", "Other", "Plain"]
+    with tempfile.TemporaryDirectory() as d:  # a rename keeps each link's shown text and heading; a stale tick or filing does nothing
+        write_note("Old.md", "# Old\n", d)
+        write_note("Uses.md", "[[Old]] [[Old|the old one]] [[Old#Part]] [[Older]]\nt first\n", d)
+        write_note(INBOX_FILE, "- one\n- two\n", d)
+        assert rename_note("Old.md", "New", d) == ("New.md", 1)
+        assert read_note("Uses.md", d).startswith("[[New]] [[New|the old one]] [[New#Part]] [[Older]]")
+        stale = parse_tasks(d)[0]
+        write_note("Uses.md", "a new first line\n" + read_note("Uses.md", d), d)
+        assert toggle_task(stale, d) is None and "t first" in read_note("Uses.md", d)
+        item = parse_inbox(d)[1]
+        write_note(INBOX_FILE, "- two\n", d)  # 'one' was filed elsewhere: line 1 is gone
+        assert classify_as_task(item, None, d) is False and classify_as_note(item, d) is None
+        assert classify_as_event(item, "2026-12-01", None, d) is False and read_note(INBOX_FILE, d) == "- two\n"
+        assert classify_as_task(parse_inbox(d)[0], None, d) is True and read_note(INBOX_FILE, d) == "t two\n"
     with tempfile.TemporaryDirectory() as d:
         write_note("A.md", "# A\n\nSee [[B]]. #work\n\n- [ ] write intro due:2020-01-01\n", d)
         write_note("B.md", "# B\n\nBack to [[A]]. #personal\n\n- [x] done thing\n- [ ] no date task\n", d)
@@ -2399,8 +2444,13 @@ def selftest():
         os.remove(os.path.join(d, "C.md"))
         os.remove(os.path.join(d, "D.md"))
 
-        tmpl = learning_note_template("Deep Work")
+        tmpl = learning_note_template("Deep Work", date(2026, 11, 10))
         assert tmpl.startswith("# Deep Work\n")
+        # only the first sitting is a task; no guidance line files itself anywhere
+        assert [l for l in tmpl.splitlines() if TASK_RE.match(l)] == ["t First look, 20 minutes: Deep Work due:2026-11-10"]
+        assert all(h in tmpl.splitlines() for h in LEARNING_HINTS)
+        assert not any(SHORTHAND_RE.match(l) or ANSWER_RE.match(l) and l.strip() != "answer::" for l in tmpl.splitlines())
+        assert expand_shorthand(tmpl, date(2026, 11, 10))[0] == tmpl and "photoread" not in tmpl.lower()
         for section in ("# Prepare", "# Preview", "# Postview", "# Your Questions", "# Activation",
                         "# Next Steps"):
             assert section in tmpl
@@ -2413,7 +2463,23 @@ def selftest():
         assert back.count("library::") == 1 and library_of(back) == "public" and back.replace("public", "personal") == mine
         assert library_of(set_library("no title", True)) == "personal" and is_book_note("library:: public\n")
         assert parse_links(tmpl) == ["Home"]  # no accidental links (was [[brackets]])
-        assert not any(TASK_RE.match(l) for l in tmpl.splitlines())  # the hint isn't a task
+        # ticking a sitting writes the next one on its day, once: three sittings, two checks, then nothing
+        write_note("Deep Work.md", tmpl, d)
+        mine = lambda: [t for t in parse_tasks(d) if t["file"] == "Deep Work.md"]
+        for day, then in ((11, "Find the answers, 25 minutes: Deep Work due:2026-11-12"),
+                          (12, "Say it back, 20 minutes: Deep Work due:2026-11-14"),
+                          (14, "Check from memory, a week on: Deep Work due:2026-11-21"),
+                          (21, "Check from memory, a month on: Deep Work due:2026-12-12")):
+            toggle_task([t for t in mine() if not t["done"]][0], d, date(2026, 11, day))
+            assert [t["text"] for t in mine() if not t["done"]] == [then], mine()
+        first = mine()[0]
+        toggle_task(first, d)  # un-ticked and ticked again: no second copy of what follows
+        toggle_task(mine()[0], d)
+        assert len(mine()) == 5 and sum(t["done"] for t in mine()) == 4
+        toggle_task([t for t in mine() if not t["done"]][0], d)
+        assert len(mine()) == 5 and all(t["done"] for t in mine())  # the last check ends it
+        assert next_sitting("call the bank", [], date(2026, 11, 10)) is None
+        os.remove(os.path.join(d, "Deep Work.md"))
         blank = blank_note_template("Ideas")
         assert blank.startswith("# Ideas\n") and parse_links(blank) == ["Home"]
 

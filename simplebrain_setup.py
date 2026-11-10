@@ -263,7 +263,7 @@ class EmailSetup(_Wizard):
             cfg, line = r
             mail.save_config(cfg)
             self.saved = cfg
-            self.result_line = line + " The digest comes at 9 and 4; File > Mail opens your inbox."
+            self.result_line = line + " The digest comes at 9 and 4; the Mail button at the top opens your inbox."
             self.accept()
         self.bg(work, done, "Trying it…")
 

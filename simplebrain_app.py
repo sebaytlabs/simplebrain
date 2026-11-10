@@ -79,7 +79,6 @@ class Bridge(QObject):
     ics_fetched = Signal(object, bool)
     publish_done = Signal(str)  # "" on success, else why the website update failed
     reco_done = Signal(str, str)  # vault it was built for, result
-    update_found = Signal(str)  # release tag newer than this build
     update_done = Signal(str)  # "" on success, else why it failed
     cite_found = Signal(object, str)  # candidate reference lines, or [] and why the lookup failed
     sync_status = Signal(object)  # {"state", "message", "time"} from the device-sync thread
@@ -874,7 +873,6 @@ class SimpleBrain(QMainWindow):
     def __init__(self):
         super().__init__()
         core.ensure_vault()
-        cleaned = self.clean_up_after_update()  # before the panels read tasks and the calendar
         core.expand_shorthand_in_vault()  # t/i/c lines typed outside the app
         core.sync_answer_notes()  # catches notes edited outside the app
         self.setWindowTitle(APP_NAME)
@@ -885,7 +883,6 @@ class SimpleBrain(QMainWindow):
         self.bridge = Bridge()
         self.bridge.ics_fetched.connect(self.on_ics_fetched)
         self.bridge.reco_done.connect(self.on_reco_done)
-        self.bridge.update_found.connect(self.on_update_found)
         self.bridge.update_done.connect(self.on_update_done)
         self.bridge.cite_found.connect(self.on_cite_found)
         self.bridge.sync_status.connect(self.on_sync_status)
@@ -900,7 +897,6 @@ class SimpleBrain(QMainWindow):
         self._update_pending, self.server = False, None
         self._today_busy, self._today_at = False, 0.0
         self._search_seq = 0  # the newest search; older answers arriving late are dropped
-        self.desktop_mode = False  # True when SimpleBrain is the Mint desktop itself (--desktop at login)
         self.opener = desk.launch  # tests swap this for a recorder
         self._place = None  # (windows before, give up at, rect) while a file opened from a note comes up
         self._place_timer = QTimer(self, interval=200)
@@ -967,8 +963,6 @@ class SimpleBrain(QMainWindow):
         self._today_timer.timeout.connect(self.update_today)
         self._today_timer.start()
         self.open_note("Home.md")
-        if cleaned:
-            self.save_status.setText(cleaned)
         self.apply_theme()  # Glass needs the panels built
         self.start_recommendations()
         self.start_update_check()
@@ -1066,14 +1060,14 @@ class SimpleBrain(QMainWindow):
         """The typed time as HH:MM, or None after telling the user why."""
         t = core.parse_time(s)
         if t is None:
-            self.show_error(f"'{s}' isn't a time (e.g. 14:30 or 2:30pm) — {consequence}")
+            self.show_error(f"'{s}' isn't a time (e.g. 14:30 or 2:30pm): {consequence}")
         return t
 
     def read_date(self, s, consequence):
-        """The typed date (MM-DD-YYYY), or None after telling the user why."""
+        """The typed date (fri, nov 5, MM-DD-YYYY…), or None after telling the user why."""
         d = core.parse_date(s)
         if d is None:
-            self.show_error(f"'{s}' isn't a valid date (need MM-DD-YYYY) — {consequence}")
+            self.show_error(f"'{s}' isn't a date (try fri, tomorrow, nov 5 or MM-DD-YYYY): {consequence}")
         return d
 
     STALE_MSG = "That item changed on disk since the list was shown. The list is refreshed; nothing was overwritten."
@@ -1187,10 +1181,10 @@ class SimpleBrain(QMainWindow):
         self.cal_button = self._button("Calendar", self.open_calendar_window)
         self.cal_button.setObjectName("calButton")
         self.cal_button.setToolTip("Your whole calendar: any day or month, and add, change or delete any event, "
-                                   "the ones from Fastmail or your phone too.")
+                                   "the ones made on your phone or in your email account too.")
         row.addWidget(self.cal_button)
         self.how_button = self._button("How to", self.start_tour)
-        self.how_button.setToolTip("A 2-minute tour of SimpleBrain, with one thing to try at each step")
+        self.how_button.setToolTip("The tutorial again: every part of SimpleBrain, one real thing to do at each step")
         row.addWidget(self.how_button)
         self.folder_label = QLabel()
         row.addWidget(self.folder_label)
@@ -1337,7 +1331,7 @@ class SimpleBrain(QMainWindow):
             if repo:
                 state, changed = updater.git_update(repo)
                 if state != "updated":
-                    say({"current": f"Up to date (checked {stamp})", "offline": "Couldn't reach GitHub; it tries again later"}
+                    say({"current": f"Up to date (checked {stamp})", "offline": "Couldn't check for a newer version; it tries again later"}
                         .get(state, f"Not updated: {state} in the code folder"))
                     return
                 cmd = updater.pip_command(repo, changed)
@@ -1351,7 +1345,7 @@ class SimpleBrain(QMainWindow):
                 return
             info = updater.release_info()
             if not info:
-                say("Couldn't reach GitHub; it tries again later")
+                say("Couldn't check for a newer version; it tries again later")
                 return
             if not core.update_available(info["tag"]):
                 say(f"Up to date (checked {stamp})")
@@ -1367,9 +1361,6 @@ class SimpleBrain(QMainWindow):
             self.bridge.update_done.emit("")
         threading.Thread(target=work, daemon=True).start()
 
-    def on_update_found(self, tag):
-        pass  # the signal stays for older callers; updates no longer ask
-
     def on_update_done(self, error):
         if error:
             self.update_state = f"Update not installed ({error}); it tries again later"
@@ -1384,8 +1375,7 @@ class SimpleBrain(QMainWindow):
         self._restart_timer.start()
 
     def restart_if_idle(self):
-        """Restart into the new version once you've stepped away: two minutes without a key or a click (SimpleBrain as
-        the desktop is always the 'active' window, so that alone never said you were away)."""
+        """Restart into the new version once you've stepped away: two minutes without a key or a click."""
         idle = watch.idle_seconds()  # 0 when this desktop can't tell: then a window you're not in counts as away
         if not (idle >= 120 or (idle == 0 and not self.isActiveWindow())):
             return
@@ -1409,22 +1399,6 @@ class SimpleBrain(QMainWindow):
         exe = sys.executable
         args = args if getattr(sys, "frozen", False) else [os.path.abspath(__file__), *args]
         os.execv(exe, [exe, *args])
-
-    def clean_up_after_update(self):
-        """One-time tidy-ups of what an earlier version left in the notes, done once without asking (the
-        originals go to the trash in the notes folder)."""
-        if core.load_settings().get("missions_trial_cleaned"):
-            return ""
-        try:
-            notes, tasks, events = updater.undo_missions_trial()
-        except OSError:
-            return ""
-        self.save_setting("missions_trial_cleaned", "yes")
-        plural = lambda n, w: f"{n} {w}" + ("s" if n != 1 else "")
-        return "" if not notes else (f"Tidied up after the old trial version: {plural(tasks, 'task')} and "
-                                     f"{plural(events, 'calendar event')} "
-                                     f"taken out of {', '.join(core.note_title(n) for n in notes)}. Every file link "
-                                     "is still there; the originals are in the trash in your notes folder.")
 
     def on_cite(self):
         query = self.ask_text("Cite source", "Article or book title, or a web address:")
@@ -1559,6 +1533,8 @@ class SimpleBrain(QMainWindow):
         return core.REPEAT_RE.sub("", core.DUE_RE.sub("", items[0]["text"])).strip() if items else None
 
     def watch_event(self, event, title=""):
+        if event in ("nudge", "welcome", "stretch") and watch.nudges_off():
+            return  # `nudges:: off` in Home: no drift, welcome-back or stand-up cards
         first = self.first_thing()
         day = self.watch_state["day"]
         if event == "nudge":
@@ -1566,7 +1542,7 @@ class SimpleBrain(QMainWindow):
             self.card(f"<b>Ten minutes on {where}.</b>" + (f"<br>Up first today: {html.escape(first)}" if first else ""),
                       [("Taking a break", lambda c: watch.snooze(self.watch_state, datetime.now())),
                        ("Back to it", lambda c: self.back_to_it())])
-        elif event == "welcome" and first and (self.desktop_mode or os.path.exists(os.path.join(core.VAULT, today_note.note_name()))):
+        elif event == "welcome" and first and os.path.exists(os.path.join(core.VAULT, today_note.note_name())):
             self.back_to_it()
             self.card(f"<b>Welcome back.</b><br>Up first: {html.escape(first)}", [("OK", lambda c: None)], seconds=20)
         elif event == "wrap_up":
@@ -1719,7 +1695,7 @@ class SimpleBrain(QMainWindow):
         return w
 
     def open_mail(self):
-        """Mail in its own SimpleBrain window (simplebrain_mailwin): never the Fastmail site."""
+        """Mail in its own SimpleBrain window (simplebrain_mailwin): no browser, no web mail."""
         w = getattr(self, "mail_window", None)
         if w is None or not w.isVisible():
             self.mail_window = w = mailwin.MailWindow(self)
@@ -1733,7 +1709,7 @@ class SimpleBrain(QMainWindow):
     def on_mail(self, items, err=""):
         self._mail_busy = False
         if err:
-            self.save_status.setText(f"Email digest: couldn't reach Fastmail ({html.escape(err[:80])}). It tries again later.")
+            self.save_status.setText(f"Email digest: couldn't reach your email ({html.escape(err[:80])}). It tries again later.")
             return
         mail.save_digest(items)
         self.update_today()
@@ -1754,22 +1730,28 @@ class SimpleBrain(QMainWindow):
         self._drop_watch = None
         self._drop_timer = QTimer(self, singleShot=True, interval=3000)  # a copy into Drop finishes first
         self._drop_timer.timeout.connect(self.file_drop_folder)
-        try:
-            self.para, self.para_yours = drop.para_root()
-            folder = drop.drop_dir(self.para)
+        try:  # no folders are made at start: Drop and the PARA folders appear the first time they're used
+            self.para, self.para_yours = drop.para_root(create=False)
         except OSError:
             self.para = None
             return
-        from PySide6.QtCore import QFileSystemWatcher
-        self._drop_watch = QFileSystemWatcher([folder], self)  # the system tells us; nothing polls
-        self._drop_watch.directoryChanged.connect(lambda *_: self._drop_timer.start())
-        QTimer.singleShot(5000, self.file_drop_folder)  # what landed there while SimpleBrain was closed
+        self._watch_drop()
         if drop.downloads_on(was_yours=self.para_yours) and core.load_settings().get("downloads_filed") != date.today().isoformat():
             QTimer.singleShot(60000, self.file_downloads)  # once a day, after start-up has settled
+
+    def _watch_drop(self):
+        """Watch the Drop folder once it exists (the system tells us; nothing polls)."""
+        folder = os.path.join(self.para, drop.DROP) if self.para else ""
+        if self._drop_watch is None and os.path.isdir(folder):
+            from PySide6.QtCore import QFileSystemWatcher
+            self._drop_watch = QFileSystemWatcher([folder], self)
+            self._drop_watch.directoryChanged.connect(lambda *_: self._drop_timer.start())
+            QTimer.singleShot(5000, self.file_drop_folder)  # what landed there while SimpleBrain was closed
 
     def open_drop_folder(self):
         if self.para:
             QDesktopServices.openUrl(QUrl.fromLocalFile(drop.drop_dir(self.para)))
+            self._watch_drop()
 
     def file_paths(self, paths, note=None, quiet=False):
         """File these off the UI thread (a folder onto another drive takes a while), then say where each went.
@@ -1853,7 +1835,7 @@ class SimpleBrain(QMainWindow):
         self.save_status.setText(f"Put {n} back where {'it was' if n == 1 else 'they were'}.")
 
     def file_drop_folder(self):
-        if self.para:
+        if self.para and os.path.isdir(os.path.join(self.para, drop.DROP)):
             self.file_paths(drop.drop_folder_items(self.para))
 
     def file_downloads(self):
@@ -2202,8 +2184,9 @@ class SimpleBrain(QMainWindow):
              "(rename) and the × (to the trash, never gone for good). Home explains everything in short lines.",
              [self.notes_list], "click <b>Home</b> in the list.",
              {"start": away_from_home, "check": lambda _: self.current_note == "Home.md"}),
-            ("A note for a book", "A Learning Note is a page for a book you're studying: your purpose, a one-sentence "
-             "summary, trigger words, your questions and what you'll do with it.",
+            ("A note for a book", "A Learning Note is a page for a book you're studying, in three short sittings: "
+             "a first look and your questions, the answers the next day, then saying it back from memory. Each "
+             "sitting is a task: tick it and the next one appears on its day.",
              [self.learning_button], "click <b>+ New Learning Note</b>, type the title of a book you're reading, "
              "and click <b>OK</b>.",
              {"start": note, "check": lambda old: self.current_note != old and core.is_book_note(text())}),
@@ -2263,10 +2246,9 @@ class SimpleBrain(QMainWindow):
         skipped or left (Tour.required). Only reaching Done counts as seen."""
         s = core.load_settings()
         if s.get("tour_done") != "yes" or s.get("tour_version") != self.TOUR_VERSION:
-            if not self.desktop_mode:  # the desktop layer is already in front of you; showNormal would undo it
-                self.showNormal()
-                self.raise_()
-                self.activateWindow()
+            self.showNormal()
+            self.raise_()
+            self.activateWindow()
             self.start_tour(required=True)
 
     def tutorial_locked(self):
@@ -2344,7 +2326,7 @@ class SimpleBrain(QMainWindow):
         self._autosave_timer = QTimer(self, singleShot=True, interval=2500)
         self._autosave_timer.timeout.connect(self.autosave)
         self.editor.textChanged.connect(self._autosave_timer.start)
-        # Website updates wait for a pause too, so a burst of saves is one trip to Shopify.
+        # Website updates wait for a pause too, so a burst of saves is one trip to the website.
         self._publish_timer = QTimer(self, singleShot=True, interval=8000)
         self._publish_timer.timeout.connect(self.publish_now)
         # A note changed by another program is picked up here, not overwritten by the next autosave.
@@ -2753,37 +2735,17 @@ class SimpleBrain(QMainWindow):
         c.insertText(f"{t} — ")
         self.editor.setTextCursor(c)
 
-    # -- SimpleBrain as the Mint desktop (--desktop at login; Super+J runs --toggle) --
-    def become_desktop(self):
-        """The window becomes the desktop layer: under every other window, no taskbar button, the size
-        of the screen above the panel. Show Desktop (Super+D) and Super+J bring it to the front.
-        It opens on the Today note, with the first thing's video or PDF already open beside it."""
-        self.desktop_mode = True
-        if sys.platform.startswith("linux"):  # Windows and macOS have no desktop layer to take: a full window
-            self.setAttribute(Qt.WA_X11NetWmWindowTypeDesktop, True)
-        g = (self.screen() or QApplication.primaryScreen()).availableGeometry()
-        self.setGeometry(g)
-        self.show() if sys.platform.startswith("linux") else self.showMaximized()
-        name, _ = today_note.update(ics_text=self._ics_text)
-        self.refresh_notes_list()
-        self.open_note(name)
-        first = today_note.first_material()
-        if first:
-            QTimer.singleShot(1500, lambda: self.open_beside(first))  # once the window has its place
-
     def open_today(self):
-        """File > Today: the Today note, written now (on any system, desktop or not)."""
+        """File > Today: the Today note, written now."""
         self.save_current()
         name, _ = today_note.update(ics_text=self._ics_text)
         self.refresh_notes_list()
         self.open_note(name)
 
     def handle_command(self, cmd):
-        """From a second `simplebrain …` (Super+J, the app menu) to the one already running."""
-        if cmd == "toggle" and self.desktop_mode and sys.platform.startswith("linux"):
-            desk.show_desktop(not desk.showing_desktop())
-            self.activateWindow()
-        elif cmd == "toggle" and self.isActiveWindow() and not self.tutorial_locked():
+        """From a second `simplebrain …` (its icon clicked again, or `--toggle` on a key of your own) to the one
+        already running."""
+        if cmd == "toggle" and self.isActiveWindow() and not self.tutorial_locked():
             self.showMinimized()
         else:
             self.showNormal()
@@ -3215,12 +3177,13 @@ class SimpleBrain(QMainWindow):
         due = due.strip()
         if due and not (due := self.read_date(due, "item stays in Inbox, nothing was lost.")):
             return
-        core.classify_as_task(item, due.isoformat() if due else None)
+        if core.classify_as_task(item, due.isoformat() if due else None) is False:
+            self.show_error(self.STALE_MSG)
         self.refresh_inbox()
         self.refresh_tasks()
 
     def on_classify_event(self, item):
-        d = self.ask_text("Event date", "MM-DD-YYYY")
+        d = self.ask_text("Event date", "fri, tomorrow, nov 5 or MM-DD-YYYY")
         if not d or not d.strip():
             return
         d = self.read_date(d.strip(), "item stays in Inbox, nothing was lost.")
@@ -3229,12 +3192,14 @@ class SimpleBrain(QMainWindow):
         t = (self.ask_text("Event time (optional)", "e.g. 14:30 or 2:30pm, blank for all-day") or "").strip()
         if t and not (t := self.read_time(t, "item stays in Inbox, nothing was lost.")):
             return
-        core.classify_as_event(item, d.isoformat(), t or None)
+        if core.classify_as_event(item, d.isoformat(), t or None) is False:
+            self.show_error(self.STALE_MSG)
         self.refresh_inbox()
         self.refresh_calendar()
 
     def on_classify_note(self, item):
-        core.classify_as_note(item)
+        if core.classify_as_note(item) is None:
+            self.show_error(self.STALE_MSG)
         self.refresh_notes_list()
         self.graph.recompute()
         self.refresh_dataview()
@@ -3354,14 +3319,13 @@ class SimpleBrain(QMainWindow):
                 self._small_button("Delete", lambda t=t: self.on_delete_task(t))]
 
     def changeEvent(self, e):
-        """Coming back to SimpleBrain (Super+J, a click) picks up what changed elsewhere, like a plan item
-        marked Done in the workbook."""
+        """Coming back to SimpleBrain picks up what changed elsewhere, like a plan item marked Done in the workbook."""
         super().changeEvent(e)
         if self.tutorial_locked() and (self.isMinimized() or (e.type() == e.Type.ActivationChange
                                                                and QApplication.activeWindow() is None)):
             QTimer.singleShot(250, self.back_to_tutorial)  # the tutorial is the way in: not minimized, not left
         if (e.type() == e.Type.ActivationChange and self.isActiveWindow() and hasattr(self, "notes_list")
-                and time.monotonic() - self._today_at > 120):  # every click on the desktop is an activation
+                and time.monotonic() - self._today_at > 120):  # not on every click back into the window
             self.schedule_today(0)
 
     def back_to_tutorial(self):
@@ -3383,8 +3347,8 @@ class SimpleBrain(QMainWindow):
 
     def update_today(self):
         """Rebuild the Today note (simplebrain_today) in the background; reload it here if it changed. Only once
-        SimpleBrain is the desktop (or a Today note is already there): the plain app makes no notes of its own."""
-        if not self.desktop_mode and not os.path.exists(os.path.join(core.VAULT, today_note.note_name())):
+        there is one (File > Today makes it): SimpleBrain makes no notes you didn't ask for."""
+        if not os.path.exists(os.path.join(core.VAULT, today_note.note_name())):
             return
         if self._today_busy:
             self.schedule_today()  # one at a time; try again when this one is done
@@ -3461,7 +3425,7 @@ class SimpleBrain(QMainWindow):
         lay.addWidget(self.calendar_status)
         add = QHBoxLayout()
         self.event_date = QLineEdit()
-        self.event_date.setPlaceholderText("MM-DD-YYYY")
+        self.event_date.setPlaceholderText("fri, nov 5…")
         self.event_date.setMaximumWidth(110)
         self.event_title = QLineEdit()
         self.event_title.setPlaceholderText("Event title")
@@ -3496,7 +3460,7 @@ class SimpleBrain(QMainWindow):
         # Blank field on purpose: the stored URL is a secret and is never shown back.
         url = self.ask_text("Connect external calendar",
                             "Paste the calendar address: an iCal/.ics link is read-only; a CalDAV address "
-                            "(Fastmail…) goes both ways, so the events you add here are sent to it.\n"
+                            "(Fastmail, iCloud, Nextcloud…) goes both ways, so the events you add here are sent to it.\n"
                             "Treat it like a password. Leave blank to disconnect.")
         if url is None:
             return
@@ -3857,11 +3821,11 @@ def main():
         return 0
     if (sys.platform.startswith("linux") and os.environ.get("XDG_SESSION_TYPE") == "wayland"
             and os.environ.get("DISPLAY") and not os.environ.get("QT_QPA_PLATFORM")):
-        os.environ["QT_QPA_PLATFORM"] = "xcb"  # through XWayland, so files open beside the note and Super+J works
+        os.environ["QT_QPA_PLATFORM"] = "xcb"  # through XWayland, so files open beside the note
     app = QApplication(sys.argv)
     sys.excepthook = crash_guard
     cmd = "toggle" if "--toggle" in sys.argv else "show"
-    if tell_running(cmd):  # Super+J, or opening it from the menu again: the running one answers
+    if tell_running(cmd):  # opened again from its icon or the menu: the running one answers
         return 0
     app.setApplicationName(APP_NAME)
     app.setApplicationVersion(core.VERSION)
@@ -3873,10 +3837,7 @@ def main():
     win.server = listen_for_commands(win)
     if os.environ.get("APPIMAGE"):
         desk.appimage_menu_entry(os.environ["APPIMAGE"], resource_path("icon.png"))
-    if "--desktop" in sys.argv:
-        win.become_desktop()
-    else:
-        win.show()
+    win.show()
     QTimer.singleShot(400, win.maybe_start_tour)  # after the window has its real size
     return app.exec()
 

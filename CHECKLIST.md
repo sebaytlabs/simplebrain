@@ -72,7 +72,7 @@ you can do outside the program; it's listed so nothing is forgotten.
 - [x] The whole calendar inside SimpleBrain: any day or month, add / edit / delete every event (Fastmail's too), place and notes, skip one date of a repeating event. proof: simplebrain_calwin.py :: class CalendarWindow
 - [x] Step 5, nothing to move around: Downloads filed. proof: simplebrain_drop.py :: def settled_downloads
 - [x] Step 6, end-of-day score. proof: simplebrain_watch.py :: def score_line
-- [x] Super+J and login autostart no longer open the old Jarvis display. proof: simplebrain_desk.py :: OLD_AUTOSTARTS = ("jarvis-hud.desktop",)
+- [x] Super+J and login autostart no longer open the old Jarvis display (the desktop mode itself was removed in 0.6.0). proof: CHANGELOG.md :: Removed: the unused desktop mode
 - [x] The workbook, one screen at a time (Today, 3 things). proof: simplebrain_today.py :: MAX_THINGS = 3
 - [x] A base course in order before the others. proof: simplebrain_today.py :: AFTER_LINE
 - [x] Never send, pay, post or delete without a yes (mail sends only on Send, deleted mail goes to Trash, calendar deletes ask first, filing has Undo). proof: simplebrain_calwin.py :: Delete “{e['title']}” on

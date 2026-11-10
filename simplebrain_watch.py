@@ -45,6 +45,18 @@ DRIFT = ("youtube", "instagram", "reddit", "facebook", "threads", "tiktok", "twi
          "thunar", "nautilus", "nemo", "caja", "dolphin", "file manager", "finder", "file explorer",
          "blocked", "access denied", "this site can")
 NEUTRAL = ("simplebrain", "lock screen", "screensaver", "xfce4-panel", "desktop")
+NUDGES_OFF = re.compile(r"^\s*nudges::\s*off\s*$", re.I | re.M)
+
+
+def nudges_off(vault=None):
+    """`nudges:: off` in Home (or Settings): no drift, welcome-back or stand-up cards. Time left and the day's
+    three still work."""
+    try:
+        return bool(NUDGES_OFF.search(core.settings_text(vault or core.VAULT)))
+    except OSError:
+        return False
+
+
 LIMIT_RE = re.compile(r"^\s*limit::\s*(?:(\d+(?:\.\d+)?)\s*h(?:ours?)?\s*(?:(\d+)\s*m(?:in)?)?|(\d+)\s*m(?:in(?:utes)?)?|"
                       r"until\s+(\d{1,2})(?::(\d{2}))?\s*([ap]m)?)\s*$", re.I | re.M)
 WORDS_RE = {"focus": re.compile(r"^\s*focus::\s*(.+?)\s*$", re.I | re.M),
@@ -393,6 +405,10 @@ def selftest():
         assert "nudge" not in qe  # quiet during a shift
         # computer time: 3h a day counts active time; 'until 9pm' is a clock time; one warning, then the line for tomorrow
         assert limit_seconds(v, used_s=3600) == 2 * 3600
+        core.write_note("Home.md", "# Home\nNudges:: OFF\n", v)
+        assert nudges_off(v)
+        core.write_note("Home.md", "# Home\nnudges:: on\nabout nudges:: off in a sentence\n", v)
+        assert not nudges_off(v)
         core.write_note("Home.md", "# Home\nlimit:: until 9pm\n", v)
         assert limit_seconds(v, now=datetime(2026, 11, 2, 20, 45)) == 15 * 60
         core.write_note("Home.md", "# Home\nlimit:: 90m\n", v)

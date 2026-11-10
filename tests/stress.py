@@ -63,7 +63,7 @@ def main():
     from PySide6.QtCore import Qt
     from PySide6.QtWidgets import QApplication
     app = QApplication([])
-    core.save_settings({"desktop_offer": "asked", "tour_done": "yes", "recommendations": "off", "missions_trial_cleaned": "yes"})
+    core.save_settings({"tour_done": "yes", "recommendations": "off"})
     w = timed("start-up", lambda: A.SimpleBrain(), 6.0)
     w.resize(1500, 950)
     w.show()

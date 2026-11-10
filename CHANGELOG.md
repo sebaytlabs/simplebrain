@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.6.0
+- **A book note is now a study plan.** **+ New Learning Note** lays a book out as three short sittings and two checks:
+  a first look where you write your purpose and your questions; the answers the next day, one question at a time,
+  typed with the book closed and then checked; and saying it back from memory two days later. Only the next sitting is
+  a task: tick it and the one after appears on its day, ending with a check a week on and a month on. The note's
+  guidance lines stay off the pages you publish.
+- `[[Note|shown text]]` and `[[Note#heading]]` links open, rename and publish like plain links.
+- A first name isn't a date: `t call tom` is the task "call tom", not "call" due tomorrow.
+- Nothing is made on your disk at the first start. The Drop folder and the Projects, Areas, Resources and Archives
+  folders appear the first time you use them.
+- `nudges:: off` in Home turns off the drift, welcome-back and stand-up cards.
+- `website intro:: your line` in Home sets the sentence at the top of your published Notes page.
+- The plan workbook is only the one you name with `plan::`; SimpleBrain no longer looks through Desktop and Documents
+  for one.
+- Search on a Mac no longer walks the whole system disk.
+- Filing an Inbox line or ticking a task after its note changed can't land on the wrong line.
+- Date boxes say what they take (fri, tomorrow, nov 5, MM-DD-YYYY). Email and calendar messages no longer name one
+  service, and point to the right buttons.
+- Removed: the unused desktop mode with its start-at-login code, and old one-time update clean-ups.
+
 ## 0.5.4
 - The examples and tests use made-up names, places and amounts.
 

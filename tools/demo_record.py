@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import simplebrain_core as core  # noqa: E402
 
 core.ensure_vault()
-core.save_settings({"desktop_offer": "asked", "recommendations": "off", "missions_trial_cleaned": "yes"})
+core.save_settings({"recommendations": "off"})
 SAMPLES = {  # a lived-in vault: two books, a project, tasks, so the graph and lists aren't empty
     "Atomic Habits.md": core.set_library(core.learning_note_template("Atomic Habits"), False).replace(
         "## One Sentence Summary::\n", "## One Sentence Summary::\nSmall habits, repeated, compound.\n").replace(
