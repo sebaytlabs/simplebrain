@@ -2,7 +2,7 @@
 
 ## What this is
 A notes app that doesn't make you configure it: plain Markdown, `[[links]]` + graph,
-one-letter tasks/inbox/calendar. PySide6 desktop app for Linux, one user.
+one-letter tasks/inbox/calendar. PySide6 desktop app for Windows, Mac and Linux (CI builds and tests all three). A few desktop helpers in `simplebrain_desk.py` are X11-only and switch themselves off elsewhere.
 
 ## Layout
 - `simplebrain_core.py`: vault logic (notes, tasks, inbox, calendar, graph layout). Runs its own selftest.
@@ -40,7 +40,7 @@ one-letter tasks/inbox/calendar. PySide6 desktop app for Linux, one user.
 - Test one module: `python simplebrain_core.py`, `python simplebrain_ics.py`, `python simplebrain_sync.py`, `python simplebrain_publish.py`, `python simplebrain_desk.py`, `python simplebrain_today.py`, `python simplebrain_find.py`, `python simplebrain_habits.py`, `python simplebrain_update.py`, then `QT_QPA_PLATFORM=offscreen python tests/test_app.py`
   (expect `selftest OK`, `ics selftest OK`, `sync selftest OK`, `desk selftest OK`, `today selftest OK`, `find selftest OK`, `habits selftest OK`, `update selftest OK` and `app test OK`; use `.venv/bin/python`).
 - Sync never touches the live vault in tests: they use temp vaults and a temp device-key folder.
-- Build: `pyinstaller packaging/simplebrain.spec`, then `packaging/linux/build-appimage.sh`.
+- Build: `pyinstaller packaging/simplebrain.spec`, then `packaging/linux/build-appimage.sh` (Linux). CI (`.github/workflows/build.yml`) makes the Windows installer and Mac disk images too.
 
 ## Conventions
 - Notes are written with `core.write_atomic` (side file, then swap in): never open a note `"w"` directly.

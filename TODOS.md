@@ -2,14 +2,6 @@
 
 Deferred items — not blocking, revisit when the trigger condition hits.
 
-- **Two-way calendar write-back** (CalDAV instead of read-only ICS
-  pull). Trigger: need to create/edit events that show up in the real
-  calendar, not just SimpleBrain's local one. Needs CalDAV credentials.
-- **Backup/sync for the vault** (~/Documents/SimpleBrain is a single point of
-  failure — no backup mechanism). Trigger: vault holds anything not also
-  recorded elsewhere.
-- **Fuzzy search across all notes (Ctrl+K)**. Trigger: sidebar note list gets
-  long enough that scrolling to find a note is annoying.
 - **Undo for Inbox classify actions**. Trigger: misclicks happen often enough
   that "just edit the text file" stops being an acceptable fix.
 - **Export/print a note or the whole vault to PDF/single markdown**. Trigger:
@@ -34,4 +26,6 @@ Deferred items — not blocking, revisit when the trigger condition hits.
   sales justify the yearly cost.
 - **Split `simplebrain_core.py`** (updater, citations, CalDAV next) **and `simplebrain_app.py`.**
   Trigger: next time one of those areas is touched.
-- **Pull-request CI runs and an in-app changelog.**
+- **An in-app changelog.**
+
+Done and removed from this list (2026-11-22): two-way calendar (CalDAV, `simplebrain_calendar.py`), vault backup and device sync (`backup-vault.sh`, `simplebrain_sync.py`), search across everything (the top bar, `simplebrain_find.py`), pull-request CI runs.
