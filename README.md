@@ -8,6 +8,52 @@ accounts as apps, and a quiet watcher that keeps you on track. No plugins, no qu
 Built for someone with little time at the computer and a lot on their mind: every feature is one line or one click,
 and it teaches itself to you one step at a time.
 
+![SimpleBrain: the tutorial ringing the capture bar](docs/tutorial.gif)
+
+*The first time you open it, a five-minute tutorial rings each part and has you do one real thing with it. ([Full video](docs/tutorial.mp4))*
+
+| | | |
+|---|---|---|
+| ![The bar](docs/bar.png) | ![Tasks](docs/tasks.png) | ![The graph](docs/graph.png) |
+| *Type a thought in the bar; it waits in the Inbox.* | *Tasks by date; tick it when it's done.* | *Your notes as a graph; click a dot to go there.* |
+
+## Why this exists
+
+"Second brain" apps promise to hold everything so your head doesn't have to. In practice most of them hand you a blank box and a manual, and leave the building to you:
+- **Obsidian and Logseq:** plugins, settings and a query language before your tasks show up by date.
+- **Notion:** a database for each kind of thing, which you have to design first.
+- **The rest:** a separate app for tasks, another for the calendar, another for money and another for files, none of them aware of the others.
+
+The people who need a second brain most have the least time to build one, and the least patience for keeping five apps in step. We were one of them: little time at the computer and a lot on our mind.
+
+So SimpleBrain makes the opposite trade:
+- **It decides the structure, so you don't have to.** One line starting with `t` is a task. One starting with `c` is an event. Anything else waits in the Inbox.
+- **The Today page picks three things.** Not thirty.
+- **It teaches itself.** A five-minute tutorial has you do one real thing with each part, and a *Learn one thing* line on Today adds one more step a day.
+- **Your notes stay plain Markdown in a folder you own.** If SimpleBrain disappeared tomorrow, every note would still open in any text editor.
+
+## What it can replace
+
+SimpleBrain is built to be a free alternative to the stack people assemble for this. Each of these is excellent at what it was made for. SimpleBrain puts the everyday parts in one window, with no setup.
+
+| If you use… | It's good at… | What SimpleBrain does instead |
+|---|---|---|
+| **Obsidian** | Local Markdown notes, links, a graph, and thousands of plugins | The same plain-Markdown-and-links foundation, with tasks, a calendar, an inbox, budget and email built in, so there's nothing to choose, install or configure. Device sync is included. |
+| **Notion** | Shared databases, wikis, team workspaces | Your notes are files on your computer, not rows in someone else's cloud. Nothing to design: tasks, events and notes already have their place. |
+| **Roam Research** | Daily notes and `[[links]]` everywhere | The same linking, free, offline, with no subscription. |
+| **Logseq** | Open-source outlining, with queries | Plain pages instead of everything-is-an-outline. The views you'd write a query for (tasks by date, today's three, notes with a tag) are already there. |
+| **Todoist + Google Calendar + a budgeting app** | Each one does its job well | One window: `t call the bank fri` is a task, `c tomorrow 2pm dentist` is an event (two-way with a CalDAV calendar), and your budget note projects your money forward. |
+
+If you love building your own system, Obsidian is wonderful and you may not need this. SimpleBrain is for people who want the system already built.
+
+## Part of a bigger set
+
+SimpleBrain is the hub. These smaller free tools handle one job each and fit around it:
+- **[Day Blocks](https://github.com/sebaytlabs/day-blocks).** Your ideal day as repeating calendar blocks. SimpleBrain's calendar shows them.
+- **[Learning Kit](https://github.com/sebaytlabs/learning-kit).** A step-by-step, research-checked book routine with timers, plus flashcards and quizzes. It goes well with SimpleBrain's *Learning Notes*.
+- **[Drive Kit](https://github.com/sebaytlabs/drive-kit).** Back up the folder your notes live in, and tidy the files you link from them.
+- **[Transcribe Folder](https://github.com/sebaytlabs/transcribe-folder).** Turn lectures and voice memos into text you can keep beside your notes.
+
 ## Download
 
 | Your computer | Get this from the [latest release](https://github.com/sebaytlabs/simplebrain/releases/latest) or the [Sebayt Labs store](https://sebaytlabs.com/products/simplebrain) | Then |
