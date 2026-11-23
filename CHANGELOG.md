@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.6.2
+- A new app icon: your notes linked to a gold hub, in SimpleBrain's warm dark colors. It matches the other Sebayt Labs tools.
+
 ## 0.6.1
 - `next mon` (any `next` + day) means that day next week. On a Tuesday, `next mon` is in six days, not thirteen.
 

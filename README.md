@@ -1,3 +1,5 @@
+<img src="packaging/icon.svg" alt="" width="112" align="right">
+
 # SimpleBrain
 
 A second brain that doesn't make you configure it. Your notes are plain Markdown files in a folder you own, linked

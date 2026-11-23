@@ -26,7 +26,7 @@ from datetime import date, datetime, timedelta
 
 from simplebrain_ics import parse_ics
 
-VERSION = "0.6.1"
+VERSION = "0.6.2"
 
 INBOX_FILE = "Inbox.md"
 CALENDAR_FILE = "Calendar.md"
