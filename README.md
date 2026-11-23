@@ -59,7 +59,7 @@ SimpleBrain is the hub. These smaller free tools handle one job each and fit aro
 | Your computer | Get this from the [latest release](https://github.com/sebaytlabs/simplebrain/releases/latest) or the [Sebayt Labs store](https://sebaytlabs.com/products/simplebrain) | Then |
 |---|---|---|
 | Windows 10 or 11 | `SimpleBrain-<version>-windows-setup.exe` | Run it. If Windows says *protected your PC*: **More info → Run anyway** (once). |
-| Mac with Apple chip (M1 and later) | `SimpleBrain-<version>-mac-ARM64.dmg` | Open it, drag SimpleBrain to Applications. First start: right-click → **Open** → **Open**. |
+| Mac with Apple chip (M1 and later) | `SimpleBrain-<version>-mac-ARM64.dmg` | Open it, drag SimpleBrain to Applications. The first time, macOS says it can't check the app: open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** (once). |
 | Mac with Intel chip (2015–2020) | `SimpleBrain-<version>-mac-X64.dmg` | Same as above. Device sync isn't available on Intel Macs yet (its library has no build there); everything else is. |
 | Linux (Mint, Ubuntu 22.04+, Debian, Fedora…) | `SimpleBrain-x86_64.AppImage` | `chmod +x SimpleBrain-x86_64.AppImage` then double-click it. It adds itself to your app menu. |
 | All three | `SimpleBrain.zip` | Everything above in one download (what the store sells). |
@@ -214,7 +214,7 @@ watcher's log, habits, and tokens stay in the settings folder on this computer.
   (`~/.config/SimpleBrain`, `%APPDATA%\SimpleBrain`, or `~/Library/Application Support/SimpleBrain`).
 - *A file opens but not beside the note*: install `wmctrl` (Linux; SimpleBrain offers to).
 - *The drift card never comes on Linux*: `xprop` (package `x11-utils`) is needed to read window titles.
-- *Mac: "can't be opened"*: right-click → Open the first time (it's not notarized yet).
+- *Mac: "can't be opened"* or *"can't check it"*: System Settings → Privacy & Security → **Open Anyway**, the first time (it's not notarized yet).
 
 ## Today and your notes
 
