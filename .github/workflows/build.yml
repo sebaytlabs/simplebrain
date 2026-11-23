@@ -19,8 +19,8 @@ jobs:
         os: [ubuntu-22.04, windows-latest, macos-15, macos-15-intel]  # macos-14 jobs are cancelled at once now  # macos-15-intel: Intel Macs (2015-2020) too
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.10"
       - name: Qt runtime libraries (Linux)
@@ -106,7 +106,7 @@ jobs:
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - id: ver  # read from the file: importing the app here (no requirements installed) failed and gave a release named 'v'
         run: |
           v=$(grep -oP '^VERSION = "\K[0-9.]+(?=")' simplebrain_core.py)
